@@ -26,4 +26,5 @@ https://github.com/DMOJ/online-judge#features
 
 For deployment and configuration details, see:  
 https://docs.k23oj.io.vn/
+
 ---
