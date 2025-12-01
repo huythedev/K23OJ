@@ -24,4 +24,6 @@ K23OJ inherits the full functionality of DMOJ and VNOJ, including:
 For the base features, refer to the original list here:  
 https://github.com/DMOJ/online-judge#features
 
+For deployment and configuration details, see:  
+https://docs.k23oj.io.vn/
 ---
