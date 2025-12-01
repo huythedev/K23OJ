@@ -3,6 +3,12 @@
 .social i {
     display: inline;
     font-size: 1.9em;
+    transition: transform $transition-fast, opacity $transition-fast;
+    
+    &:hover {
+        transform: scale(1.1);
+        opacity: 0.9;
+    }
 }
 
 .facebook-this, .tweet-this {
@@ -10,11 +16,11 @@
 }
 
 .tweet-this i {
-    color: #55ACEE;
+    color: #1DA1F2;
 }
 
 .facebook-this i {
-    color: #133783;
+    color: #1877F2;
 }
 
 .social {
@@ -22,148 +28,232 @@
     float: right;
 }
 
-// Bootstrap-y buttons
+// Modern Button Styles
 .button, button, input[type=submit] {
     color: white !important;
     text-decoration: none !important;
     cursor: pointer;
     vertical-align: middle;
     white-space: nowrap;
-    font-weight: 400;
-    line-height: 1.4;
-    background: rgb(51, 122, 183) none repeat scroll 0 (0% / auto) padding-box border-box;
-    background: -webkit-linear-gradient(top, #337ab7 0, #265a88 100%) repeat-x;
-    background: linear-gradient(to bottom, #337ab7 0, #265a88 100%) repeat-x;
+    font-weight: 500;
+    line-height: 1.5;
+    background: linear-gradient(135deg, $highlight_blue 0%, $highlight_blue_dark 100%);
     border-radius: $widget_border_radius;
-    padding: 6px 12px;
-    display: block;
+    padding: $spacing-3 $spacing-5;
+    display: inline-block;
     border: 0;
     text-align: center;
-
-    // 4k hack
     font-size: $base_font_size;
+    font-family: $font-family-sans;
+    box-shadow: $shadow-sm;
+    transition: all $transition-fast;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 100%);
+        opacity: 0;
+        transition: opacity $transition-fast;
+    }
 
     &:hover {
-        background: #265a88;
+        background: linear-gradient(135deg, $highlight_blue_light 0%, $highlight_blue 100%);
+        box-shadow: $shadow-md;
+        transform: translateY(-1px);
+        
+        &::before {
+            opacity: 1;
+        }
     }
 
     &:active {
-        border-color: #245580;
-        background: #265a88;
+        transform: translateY(0);
+        box-shadow: $shadow-sm;
     }
 
     &.full {
-        padding: 6px 0;
+        padding: $spacing-3 0;
+        width: 100%;
     }
 
     &.disabled {
-        background: linear-gradient(to bottom, darkgray 0, gray 100%) repeat-x !important;
-        border-color: grey !important;
+        background: linear-gradient(135deg, $color_primary33 0%, $color_primary50 100%) !important;
         cursor: not-allowed;
+        opacity: 0.7;
+        box-shadow: none;
+        transform: none;
+    }
+}
+
+// Secondary button variant
+.button-secondary {
+    background: $color_primary0 !important;
+    color: $color_primary75 !important;
+    border: 1px solid $color_primary25;
+    
+    &:hover {
+        background: $color_primary5 !important;
+        border-color: $color_primary33;
+    }
+}
+
+// Danger button variant  
+.button-danger {
+    background: linear-gradient(135deg, $color_danger100 0%, darken($color_danger100, 10%) 100%) !important;
+    
+    &:hover {
+        background: linear-gradient(135deg, lighten($color_danger100, 5%) 0%, $color_danger100 100%) !important;
     }
 }
 
 .inline-button {
     display: inline;
     vertical-align: top;
-    padding: 3px 6px;
+    padding: $spacing-2 $spacing-3;
+    font-size: 0.9em;
 }
 
+// Modern Input Styles
 input {
     &[type=text], &[type=password], &[type=email], &[type=number], &[type=url] {
-        padding: 4px 8px;
+        padding: $spacing-3 $spacing-4;
         color: $color_primary75;
         background: $color_primary0 none;
         border: 1px solid $color_primary25;
         border-radius: $widget_border_radius;
-        box-shadow: 0 1px 1px rgba($color_primary100, 0.075) inset;
-        transition: border-color 0.15s ease-in-out 0s, box-shadow 0.15s ease-in-out 0s;
+        box-shadow: $shadow-xs;
+        transition: all $transition-fast;
         box-sizing: border-box;
-
-        // Need this explicitly because UA stylesheet for Chrome on 4k makes
-        // everything look bad otherwise (forces it to 9.3px)
         font-size: $base_font_size;
+        font-family: $font-family-sans;
 
         &:hover {
-            border-color: rgba(82, 168, 236, 0.8);
-            box-shadow: inset 0 1px 1px rgba($color_primary100, 0.075), 0 0 4px rgba(82, 168, 236, 0.6);
+            border-color: $color_primary33;
+            box-shadow: $shadow-sm;
         }
 
         &:focus {
-            border-color: rgba(82, 168, 236, 0.8);
-            box-shadow: inset 0 1px 1px rgba($color_primary100, 0.075), 0 0 8px rgba(82, 168, 236, 0.6);
+            border-color: $highlight_blue;
+            box-shadow: 0 0 0 3px rgba($highlight_blue, 0.15);
             outline: 0;
+        }
+        
+        &::placeholder {
+            color: $color_primary33;
         }
     }
 
     &[type=number] {
-        padding: 2px 0 2px 5px;
+        padding: $spacing-2 0 $spacing-2 $spacing-3;
     }
 
     &[type=checkbox] {
         appearance: none;
+        -webkit-appearance: none;
         vertical-align: middle;
-        border: 1px solid $color_primary50;
+        border: 2px solid $color_primary33;
         background: $color_primary0;
-        border-radius: 2px;
-        width: 0.95em;
-        height: 0.95em;
+        border-radius: $widget_border_radius_sm;
+        width: 1.1em;
+        height: 1.1em;
         cursor: pointer;
+        transition: all $transition-fast;
+        position: relative;
+
+        &:hover {
+            border-color: $highlight_blue;
+        }
 
         &:checked {
-            appearance: auto;
-            accent-color: $highlight_blue;
+            background: $highlight_blue;
+            border-color: $highlight_blue;
+            
+            &::after {
+                content: '✓';
+                position: absolute;
+                color: white;
+                font-size: 0.75em;
+                font-weight: bold;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+            }
+        }
+        
+        &:focus {
+            box-shadow: 0 0 0 3px rgba($highlight_blue, 0.15);
+            outline: none;
         }
     }
 }
 
+// Modern Textarea
 textarea {
-    padding: 4px 8px;
+    padding: $spacing-3 $spacing-4;
     color: $color_primary75;
     background: $color_primary0 none;
     border: 1px solid $color_primary25;
     border-radius: $widget_border_radius;
-    box-shadow: 0 1px 1px rgba($color_primary100, 0.075) inset;
-    transition: border-color 0.15s ease-in-out 0s, box-shadow 0.15s ease-in-out 0s;
+    box-shadow: $shadow-xs;
+    transition: all $transition-fast;
     box-sizing: border-box;
+    font-family: $font-family-sans;
+    font-size: $base_font_size;
+    line-height: 1.6;
+    resize: vertical;
+    min-height: 100px;
 }
 
 textarea:hover {
-    border-color: rgba(82, 168, 236, 0.8);
-    box-shadow: inset 0 1px 1px rgba($color_primary100, 0.075), 0 0 4px rgba(82, 168, 236, 0.6);
+    border-color: $color_primary33;
+    box-shadow: $shadow-sm;
 }
 
 textarea:focus {
-    border-color: rgba(82, 168, 236, 0.8);
-    box-shadow: inset 0 1px 1px rgba($color_primary100, 0.075), 0 0 8px rgba(82, 168, 236, 0.6);
+    border-color: $highlight_blue;
+    box-shadow: 0 0 0 3px rgba($highlight_blue, 0.15);
     outline: 0;
 }
 
-// Bootstrap-y copy button
+// Modern Copy Button
 .btn-clipboard {
-    top: 0;
-    right: 0;
+    top: $spacing-2;
+    right: $spacing-2;
     display: block;
-    font-size: 12px;
-    font-weight: bold;
+    font-size: 0.75em;
+    font-weight: 600;
     color: $color_primary50;
     cursor: pointer;
-    background-color: $color_pageBg;
+    background-color: $color_primary0;
     border: 1px solid $color_primary25;
-    border-radius: 0 $widget_border_radius;
+    border-radius: $widget_border_radius_sm;
     position: absolute;
-    padding: 5px 8px;
+    padding: $spacing-2 $spacing-3;
+    transition: all $transition-fast;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    
+    &:hover {
+        background: $color_primary5;
+        color: $color_primary75;
+        border-color: $color_primary33;
+    }
 }
 
 .copy-clipboard {
     position: relative;
-    margin-top: 1.5em;
+    margin-top: $spacing-4;
 }
 
-// Bootstrap-y tabs
+// Modern Tabs
 .ul_tab_a_active {
     color: $color_primary100;
-    // Cover up the bottom border of active tabs with this color
     background: $color_pageBg;
     cursor: default;
     border: 1px solid $color_primary25;
@@ -172,30 +262,34 @@ textarea:focus {
 }
 
 .tabs {
-    border-bottom: 1px solid $color_primary25;
-    margin: 0 0 8px;
+    border-bottom: 2px solid $color_primary25;
+    margin: 0 0 $spacing-4;
     width: 100%;
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     flex-wrap: wrap;
+    gap: $spacing-1;
 
     .tab {
         .tab-icon {
-            padding-right: 0.3em;
+            padding-right: $spacing-2;
             color: $color_primary50;
 
             &.fa-plus {
-                color: green !important;
+                color: $highlight_blue !important;
             }
         }
 
         a, span {
             border-top-width: 3px !important;
+            border-radius: $widget_border_radius $widget_border_radius 0 0;
+            transition: all $transition-fast;
         }
 
         &.active {
             a, span {
                 border-top-color: $highlight_blue !important;
+                background: $color_pageBg;
             }
 
             .tab-icon {

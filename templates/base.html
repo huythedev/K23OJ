@@ -10,6 +10,12 @@
         <meta name="description" property="og:description" content="{{ meta_description }}">
     {% endif %}
     <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1">
+    
+    <!-- Modern Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
     <!-- Favicons-->
     <link rel="apple-touch-icon" sizes="57x57" href="/apple-touch-icon-57x57.png">
     <link rel="apple-touch-icon" sizes="60x60" href="/apple-touch-icon-60x60.png">
@@ -24,6 +30,10 @@
     <link rel="icon" type="image/png" href="/android-chrome-192x192.png" sizes="192x192">
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
     <link rel="icon" type="image/png" href="/favicon-16x16.png" sizes="16x16">
+    <!-- Additional favicon & platform support -->
+    <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon-precomposed.png">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#2563ff">
+    <meta name="msapplication-config" content="/browserconfig.xml">
     <link rel="manifest" href="/manifest.json">
     <meta name="msapplication-TileColor" content="#231F20">
     <meta name="msapplication-TileImage" content="/mstile-144x144.png">
@@ -39,27 +49,96 @@
     <meta property="og:url"
           content="{{ DMOJ_SCHEME }}://{{ DMOJ_CANONICAL|default(site.domain) }}{{ request.get_full_path() }}">
 
+    <meta name="description" property="og:description" content="{{ meta_description }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="K23OJ Online Judge">
+    <meta name="twitter:image" content="https://k23oj.io.vn/static/icons/logo.png">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": []
+    }
+    </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "url": "https://k23oj.io.vn",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://k23oj.io.vn/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
     {% block meta %}{% endblock %}
     {% if not INLINE_FONTAWESOME %}
         <link rel="stylesheet" href="{{ FONTAWESOME_CSS }}">
     {% endif %}
     {% compress css %}
-        {# TODO: once dark mode support is better, enable for all users by deleting the else branch #}
-        {% if perms.judge.test_site %}
-            {% if PREFERRED_STYLE_CSS is not none %}
-                <link rel="stylesheet" href="{{ static(PREFERRED_STYLE_CSS) }}">
-            {% else %}
-                <link rel="stylesheet" href="{{ static(LIGHT_STYLE_CSS) }}">
-                <link rel="stylesheet" href="{{ static(DARK_STYLE_CSS) }}" media="(prefers-color-scheme: dark)">
-            {% endif %}
-        {% else %}
-            <link rel="stylesheet" href="{{ static(LIGHT_STYLE_CSS) }}">
-        {% endif %}
         {% if INLINE_FONTAWESOME %}<link rel="stylesheet" href="{{ static('libs/fontawesome/font-awesome.css') }}">{% endif %}
         <link rel="stylesheet" href="{{ static('source_sans_pro.css') }}">
         <link rel="stylesheet" type="text/css" href="{{ static('libs/clipboard/tooltip.css') }}">
         <link rel="stylesheet" type="text/css" href="{{ static('libs/select2/select2.css') }}">
     {% endcompress %}
+
+    <link id="theme-style" rel="stylesheet" href="{% if PREFERRED_STYLE_CSS %}{{ static(PREFERRED_STYLE_CSS) }}{% else %}{{ static(LIGHT_STYLE_CSS) }}{% endif %}">
+
+    <script>
+        var lightTheme = "{{ static(LIGHT_STYLE_CSS) }}";
+        var darkTheme = "{{ static(DARK_STYLE_CSS) }}";
+        
+        function applyTheme(theme) {
+            var link = document.getElementById('theme-style');
+            if (theme === 'dark') {
+                link.href = darkTheme;
+            } else {
+                link.href = lightTheme;
+            }
+            var icon = document.getElementById('theme-icon');
+            if (icon) {
+                icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+            }
+        }
+
+        function toggleTheme() {
+            var link = document.getElementById('theme-style');
+            var currentTheme = link.href.indexOf(darkTheme) !== -1 ? 'dark' : 'light';
+            var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('theme', newTheme);
+            applyTheme(newTheme);
+        }
+
+        (function() {
+            var savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                applyTheme(savedTheme);
+            } else {
+                {% if not PREFERRED_STYLE_CSS %}
+                    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                        applyTheme('dark');
+                    }
+                {% endif %}
+            }
+        })();
+        
+        document.addEventListener("DOMContentLoaded", function() {
+             var link = document.getElementById('theme-style');
+             var isDark = link.href.indexOf(darkTheme) !== -1;
+             var icon = document.getElementById('theme-icon');
+             if (icon) {
+                 icon.textContent = isDark ? '☀️' : '🌙';
+             }
+        });
+    </script>
     <link rel="canonical"
           href="{{ DMOJ_SCHEME }}://{{ DMOJ_CANONICAL|default(site.domain) }}{{ request.get_full_path() }}">
     {% if request.user.is_impersonate %}
@@ -204,6 +283,17 @@
             }
         </style>
     </noscript>
+
+    <!-- Google Structured Data for Logo -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "url": "https://k23oj.io.vn",
+      "logo": "https://k23oj.io.vn/static/icons/logo.png",
+      "name": "K23OJ Online Judge"
+    }
+    </script>
 </head>
 <body{% if perms.judge.test_site %} data-theme="{{ SITE_THEME_NAME }}"{% endif %}>
 <svg width="0" height="0" style="display: block">
@@ -251,6 +341,9 @@
         </ul>
 
         <span id="user-links">
+            <a href="javascript:toggleTheme()" style="margin-right: 10px; text-decoration: none;" title="{{ _('Toggle light/dark mode') }}">
+                <span id="theme-icon" style="font-size: 1.2em;">🌙</span>
+            </a>
             <a href=
                 {% if request.resolver_match.view_name == "problem_detail" and problem %}
                     "{{ url('new_problem_ticket', problem.code) }}"
@@ -306,7 +399,7 @@
             {% endif %}
         </span>
     </div>
-    <div id="nav-shadow"></div>
+    <!-- <div id="nav-shadow"></div> -->
 </nav>
 {% if request.in_contest %}
     {% set current_contest = request.participation.contest %}
@@ -362,8 +455,11 @@
     <footer>
         <span id="footer-content">
             <br>
-            {{_('proudly powered by %(dmoj)s', dmoj=safe('<a style="color: #808080" href="https://dmoj.ca"><b>DMOJ</b></a>'))}} |
-            {{_('follow us on %(github)s and %(facebook)s', github=safe('<a style="color: #808080" href="https://github.com/VNOI-Admin/OJ"><b>Github</b></a>'), facebook=safe('<a style="color: #808080" href="https://www.facebook.com/vnoi.wiki"><b>Facebook</b></a>'))}}
+            {{ _('proudly powered by %(dmoj)s and %(vnoj)s',
+                dmoj=safe('<a style="color: #808080" href="https://dmoj.ca"><b>DMOJ</b></a>'),
+                vnoj=safe('<a style="color: #808080" href="https://oj.vnoi.info"><b>VNOJ</b></a>')) }} |
+            {{ _('follow us on %(facebook)s',
+                facebook=safe('<a style="color: #808080" href="https://www.facebook.com/profile.php?id=61564628423543"><b>Facebook</b></a>')) }}
             {% if misc_config.footer %}
                 {{ misc_config.footer|safe }} |
             {% endif %}

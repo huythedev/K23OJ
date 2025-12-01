@@ -2,64 +2,94 @@
 
 .h-scrollable-table {
     overflow-x: auto;
+    border-radius: $widget_border_radius_lg;
 }
 
+// Modern Table Styles
 .table {
     border-spacing: 0;
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    margin-bottom: 0.5em;
-    background: rgba($color_primary100, 0.01);
-    backdrop-filter: blur(3px);
+    margin-bottom: $spacing-4;
+    background: $color_primary0;
+    border-radius: $widget_border_radius_lg;
+    overflow: hidden;
+    box-shadow: $shadow-sm;
+    border: 1px solid $color_primary25;
 
     &.striped tr:nth-child(2n) {
-        background: rgba($color_primary100, 0.03);
+        background: $color_primary5;
     }
 
     th {
-        height: 2em;
+        height: 2.5em;
         color: $color_primary0;
-        background-color: $color_primary75;
-        border-color: $color_primary50;
-        border-width: 0 1px 1px 0;
-        border-style: solid;
-        padding: 4px 10px;
+        background: linear-gradient(135deg, $color_primary75 0%, darken($color_primary75, 5%) 100%);
+        border-color: transparent;
+        border-width: 0;
+        border-bottom: 2px solid $highlight_blue;
+        padding: $spacing-3 $spacing-4;
         vertical-align: middle;
         text-align: center;
         white-space: nowrap;
         font-weight: 600;
-        font-size: 1.1em;
+        font-size: 0.9em;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
     }
 
     td {
-        border-color: $color_primary25;
-        border-width: 0 1px 1px 0;
+        border-color: $color_primary10;
+        border-width: 0 0 1px 0;
         border-style: solid;
-        padding: 7px 5px;
+        padding: $spacing-3 $spacing-4;
         vertical-align: middle;
         text-align: center;
+        transition: background $transition-fast;
     }
 
-    // Border fixes
+    // Remove side borders for cleaner look
     th:first-child, td:first-child {
-        border-left-width: 1px;
+        border-left-width: 0;
+    }
+    
+    th:last-child, td:last-child {
+        border-right-width: 0;
     }
 
     tr:first-child th, tr:first-child td {
-        border-top-width: 1px;
+        border-top-width: 0;
+    }
+    
+    // Last row has no bottom border
+    tbody tr:last-child td {
+        border-bottom-width: 0;
     }
 
-    // Rounded corners for <th>
+    // Hover effect for rows
+    tbody tr {
+        transition: background $transition-fast;
+        
+        &:hover {
+            background: rgba($highlight_blue, 0.05);
+        }
+    }
+
+    // Rounded corners for table header
     tr:first-child th:first-child {
-        border-top-left-radius: $table_header_rounding;
+        border-top-left-radius: $widget_border_radius_lg;
     }
 
     tr:first-child th:last-child {
-        border-top-right-radius: $table_header_rounding;
+        border-top-right-radius: $widget_border_radius_lg;
     }
 
-    tbody tr:last-child th:first-child {
-        border-bottom-left-radius: $table_header_rounding;
+    tbody tr:last-child td:first-child {
+        border-bottom-left-radius: $widget_border_radius_lg;
+    }
+    
+    tbody tr:last-child td:last-child {
+        border-bottom-right-radius: $widget_border_radius_lg;
     }
 }

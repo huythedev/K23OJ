@@ -1,30 +1,45 @@
+# --- Allow Search Engines to index the site ---
 User-agent: *
+Allow: /
+Allow: /problems/
+Allow: /problem/
+Allow: /contests/
+Allow: /contest/
+Allow: /users/
+
+# --- Block sensitive or private DMOJ paths ---
 Disallow: /500
 Disallow: /accounts
 Disallow: /admin
 Disallow: /api
 Disallow: /comments
+Disallow: /judge-select2
+Disallow: /feed
+Disallow: /data
+Disallow: /src
+Disallow: /widgets
+Disallow: /stats
+
+# Contest private routes
 Disallow: /contest/*/clone
 Disallow: /contest/*/join
 Disallow: /contest/*/leave
 Disallow: /contest/*/moss
 Disallow: /contest/*/participation
 Disallow: /contest/*/participations
-Disallow: /contest/*/rank
-Disallow: /contests/tag
 Disallow: /contest/*/stats
 Disallow: /contest/*/submissions
-Disallow: /data
-Disallow: /edit/profile/$
-Disallow: /feed
-Disallow: /judge-select2
-Disallow: /mailgun/mail_activate/$
+Disallow: /contest/*/rank
+
+# Organization management
 Disallow: /organization/*/edit
 Disallow: /organization/*/join
 Disallow: /organization/*/kick
 Disallow: /organization/*/leave
 Disallow: /organization/*/request
 Disallow: /organization/*/requests
+
+# Problem management / Data / PDFs
 Disallow: /problem/*/clone
 Disallow: /problem/*/data
 Disallow: /problem/*/manage/submission
@@ -32,19 +47,45 @@ Disallow: /problem/*/pdf
 Disallow: /problem/*/rank
 Disallow: /problem/*/raw
 Disallow: /problem/*/resubmit
-Disallow: /problems/random/$
 Disallow: /problem/*/submissions
 Disallow: /problem/*/submit
 Disallow: /problem/*/test_data
 Disallow: /problem/*/tickets
-Disallow: /src
-Disallow: /stats
+Disallow: /problems/random/
+
+# Submissions, Tickets, Tasks
 Disallow: /submission
 Disallow: /submissions
 Disallow: /tasks
 Disallow: /ticket
 Disallow: /tickets
+
+# User pages that must NOT be indexed
 Disallow: /user/$
-Disallow: /users/find/$
+Disallow: /users/find/
 Disallow: /user/*/submissions
-Disallow: /widgets
+
+# --- AI Crawl Control ---
+# Allow search indexing but block model training
+User-Agent: GPTBot
+Disallow: /
+
+User-Agent: Google-Extended
+Disallow: /
+
+User-Agent: Bingbot
+Allow: /
+
+User-Agent: Amazonbot
+Disallow: /
+
+User-Agent: Bytespider
+Disallow: /
+
+User-Agent: ClaudeBot
+Disallow: /
+
+User-Agent: CCBot
+Disallow: /
+
+Sitemap: https://k23oj.io.vn/sitemap.xml

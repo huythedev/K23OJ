@@ -1,5 +1,6 @@
 @use "vars" as *;
 
+// Modern viewport settings
 @-ms-viewport {
     min-width: 480px;
     max-width: device-width;
@@ -15,8 +16,10 @@
     max-width: device-width;
 }
 
+// Modern Link Styles
 a {
     color: $color_link75;
+    transition: color $transition-fast;
 
     &:hover {
         color: $color_link100;
@@ -29,28 +32,29 @@ a {
 
 img {
     max-width: 100%;
-    // width: auto;
-    // height: auto;
 }
 
 .full {
     width: 100%;
 }
 
+// Modern Sortable Tables
 table.sortable thead {
     background-color: $color_primary10;
-    color: #666;
-    font-weight: bold;
+    color: $color_primary66;
+    font-weight: 600;
     cursor: default;
 }
 
 th {
     &.tablesorter-headerAsc:after {
         content: " ▴";
+        color: $highlight_blue;
     }
 
     &.tablesorter-headerDesc:after {
         content: " ▾";
+        color: $highlight_blue;
     }
 }
 
@@ -62,6 +66,11 @@ div {
 
 pre {
     white-space: pre-wrap;
+    background: $color_primary5;
+    padding: $spacing-4;
+    border-radius: $widget_border_radius;
+    border: 1px solid $color_primary25;
+    overflow-x: auto;
 }
 
 hr {
@@ -71,6 +80,7 @@ hr {
     font-style: italic;
     border-bottom: 1px solid $color_primary25;
     padding: 0;
+    margin: $spacing-4 0;
 }
 
 .dashed {
@@ -81,17 +91,19 @@ th {
     vertical-align: middle;
 }
 
+// Modern Form Areas
 .form-area {
     display: inline-block;
-    background: $color_primary5;
-    padding: 5px 10px 10px;
-    border-radius: $widget_border_radius;
+    background: $color_primary0;
+    padding: $spacing-4 $spacing-5;
+    border-radius: $widget_border_radius_lg;
     border: 1px solid $color_primary25;
+    box-shadow: $shadow-sm;
 }
 
 div.info-float {
     float: right;
-    padding: 10px;
+    padding: $spacing-4;
 }
 
 footer {
@@ -102,84 +114,103 @@ footer {
     bottom: 0;
 }
 
+// Modern Body Styles
 body {
     position: relative;
     min-height: 100%;
     margin: 0 auto;
     font-size: $base_font_size;
-    line-height: 1.231;
-    background: $color_primary5;
-    font-family: "Segoe UI", "Lucida Grande", Arial, sans-serif;
+    line-height: 1.6;
+    background: linear-gradient(135deg, $color_primary5 0%, $color_primary10 100%);
+    font-family: $font-family-sans;
     color: $color_primary100;
     height: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 .unselectable {
     cursor: default;
+    user-select: none;
 }
 
+// Modern Typography
 h1 {
-    font-size: 5em;
-    letter-spacing: -2px;
+    font-size: 3em;
+    letter-spacing: -0.025em;
     margin: 0;
     padding: 0;
-    line-height: 1em;
+    line-height: 1.1;
+    font-weight: 700;
+    font-family: $font-family-heading;
+    color: $color_primary90;
 }
 
 b {
-    font-weight: bold;
+    font-weight: 600;
 }
 
 h2 {
-    font-weight: 400;
-    font-size: 2em;
+    font-weight: 600;
+    font-size: 1.75em;
     border-radius: $widget_border_radius;
     padding: 0;
     margin: 0;
+    letter-spacing: -0.025em;
+    color: $color_primary90;
+    font-family: $font-family-heading;
 }
 
 h3 {
-    font-weight: 400;
-    font-size: 1.4em;
+    font-weight: 600;
+    font-size: 1.35em;
     border-radius: $widget_border_radius;
     padding: 0;
     margin: 0;
+    color: $color_primary75;
+    font-family: $font-family-heading;
 }
 
 h4 {
     font-size: 1.1em;
+    font-weight: 600;
     padding: 0;
     margin: 0;
+    color: $color_primary75;
 }
 
 hr {
-    color: rgba(0, 0, 0, 0.2);
+    color: $color_primary25;
 }
 
+// Modern Content Area
 #content {
-    margin: 52px auto auto;
-
-    // Header
+    margin: 60px auto auto;
     width: 90%;
     height: 100%;
     min-height: 25em;
     display: block;
+    padding: $spacing-6 0;
 
     .title {
         color: $color_primary75;
     }
 }
 
+// Modern Footer
 footer {
     text-align: center;
-    height: 40px;
+    height: auto;
+    padding: $spacing-6 0;
     border-top: 1px solid $color_primary25;
-    background: $color_primary10;
+    background: $color_primary0;
+    font-size: 0.9em;
 }
 
 html {
     position: relative;
     height: 100%;
+    scroll-behavior: smooth;
 }
 
 a {
@@ -187,78 +218,98 @@ a {
     display: inline;
 }
 
+// Modern Noscript Warning
 noscript #noscript {
-    font-family: Arial, sans-serif;
-    font-size: 111%;
+    font-family: $font-family-sans;
+    font-size: 1em;
     color: white;
-    font-weight: bold;
+    font-weight: 600;
     background: $announcement_red;
     text-align: center;
-    padding: 5px 0;
+    padding: $spacing-3 0;
     left: 0;
     right: 0;
     position: fixed;
     z-index: 100;
+    box-shadow: $shadow-md;
 }
 
+// Modern Announcement Banner
 #announcement {
-    font-family: Arial, sans-serif;
-    font-size: 111%;
+    font-family: $font-family-sans;
+    font-size: 0.95em;
     color: white;
-    font-weight: bold;
-    background: $announcement_red;
+    font-weight: 600;
+    background: linear-gradient(135deg, $announcement_red 0%, darken($announcement_red, 10%) 100%);
     text-align: center;
     max-width: 30%;
     position: fixed;
-    border-radius: $widget_border_radius;
+    border-radius: $widget_border_radius_lg;
     z-index: 100;
-    bottom: -4px;
-    right: -4px;
-    padding: 5px 6px 6px 5px;
+    bottom: $spacing-4;
+    right: $spacing-4;
+    padding: $spacing-3 $spacing-4;
+    box-shadow: $shadow-lg;
+    backdrop-filter: blur(8px);
 
     a {
-        color: orange;
+        color: #fcd34d;
+        text-decoration: underline;
+        text-underline-offset: 2px;
     }
 }
 
 .time {
-    color: $color_primary75;
+    color: $color_primary50;
+    font-size: 0.9em;
 }
 
 .toggle {
-    font-weight: bold;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color $transition-fast;
 
     .fa {
-        transition: transform 0.4s;
+        transition: transform $transition-base;
     }
 
     &.open .fa {
         transform: rotate(90deg);
     }
+    
+    &:hover {
+        color: $highlight_blue;
+    }
 }
 
+// Modern Form Errors
 #form-errors, .form-errors {
-    background: rgba(255, 0, 0, 0.3);
-    border: 3px solid red;
+    background: $color_danger25;
+    border: 2px solid $color_danger100;
     border-radius: $widget_border_radius;
-    padding: 0 1em 0.1em 1em;
-    margin: 0.3em 0 0.5em 0;
+    padding: $spacing-3 $spacing-4;
+    margin: $spacing-2 0 $spacing-3 0;
+    color: $color_danger100;
+    font-weight: 500;
 }
 
+// Modern Contest Info Box
 #contest-info {
-    font-size: 1.25em;
-    border: 5px solid $highlight_blue;
-    border-left: 5px dotted white;
-    border-radius: 0 $widget_border_radius $widget_border_radius 0;
-    background: rgba(0, 0, 0, 0.77);
+    font-size: 1.1em;
+    border: none;
+    border-left: 4px solid $highlight_blue;
+    border-radius: 0 $widget_border_radius_lg $widget_border_radius_lg 0;
+    background: rgba(30, 27, 75, 0.95);
+    backdrop-filter: blur(12px);
     z-index: 100000;
-    padding: 10px 12px;
+    padding: $spacing-4 $spacing-5;
     color: white;
     cursor: move;
     position: fixed;
-    left: 20px;
-    top: 90%;
+    left: 0;
+    top: 85%;
     display: none;
+    box-shadow: $shadow-xl;
 
     a {
         height: 1.4em;
@@ -266,13 +317,21 @@ noscript #noscript {
         margin: 0;
         color: white;
         display: block;
+        transition: color $transition-fast;
+        
+        &:hover {
+            color: $highlight_blue_light;
+        }
     }
 }
 
 #contest-time-remaining {
     display: inline-block;
+    font-weight: 600;
+    color: $highlight_blue_light;
 }
 
+// Modern Page Container
 #page-container {
     min-height: 100%;
     position: relative;
@@ -281,17 +340,12 @@ noscript #noscript {
     border-left: 1px solid $color_primary25;
     background: $color_pageBg;
     max-width: 100em;
+    box-shadow: $shadow-lg;
 }
-
-// border-bottom: 1px solid rgb(204, 204, 204)
-// border-bottom-left-radius: 4px
-// border-bottom-right-radius: 4px
 
 #content-body {
-    padding-bottom: 4em;
+    padding-bottom: 5em;
 }
-
-// Offset the footer
 
 .title-line-action {
     float: right;
@@ -308,18 +362,59 @@ math {
     }
 }
 
+// Modern Selection Styles
+::selection {
+    background: rgba($highlight_blue, 0.3);
+    color: inherit;
+}
+
+// Smooth scrollbar (webkit)
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: $color_primary10;
+}
+
+::-webkit-scrollbar-thumb {
+    background: $color_primary33;
+    border-radius: 5px;
+    
+    &:hover {
+        background: $color_primary50;
+    }
+}
+
 @media(max-width: 1498px) {
     #page-container {
         border-left: none;
         border-right: none;
         border-bottom-left-radius: 0;
         border-bottom-right-radius: 0;
+        box-shadow: none;
     }
 }
 
 @media (max-width: 760px) {
     #content {
         width: auto;
-        padding: 0 5px;
+        padding: 0 $spacing-3;
+        margin-top: 52px;
+    }
+    
+    h1 {
+        font-size: 2em;
+    }
+    
+    h2 {
+        font-size: 1.5em;
+    }
+    
+    #announcement {
+        max-width: 90%;
+        right: 5%;
+        left: 5%;
     }
 }

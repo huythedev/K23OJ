@@ -345,16 +345,26 @@ class JudgeHandler(ZlibPacketHandler):
         self.judge.runtimes.set(
             Language.objects.filter(key__in=list(self.executors.keys())).values_list('id', flat=True),
         )
-
+        
         RuntimeVersion.objects.filter(judge=self.judge).delete()
         versions = []
         for lang in self.judge.runtimes.all():
-            versions += [
-                RuntimeVersion(language=lang, name=name, version='.'.join(map(str, version)),
-                               priority=idx, judge=self.judge)
-                for idx, (name, version) in enumerate(self.executors[lang.key])
-            ]
+            for idx, (name, version) in enumerate(self.executors[lang.key]):
+                # Safely build version string
+                ver_str = '.'.join(map(str, version)) if version else '1.0.0'
+                if not ver_str.strip():
+                    ver_str = '1.0.0'
+                versions.append(
+                    RuntimeVersion(
+                        language=lang,
+                        name=name,
+                        version=ver_str,
+                        priority=idx,
+                        judge=self.judge,
+                    )
+                )
         RuntimeVersion.objects.bulk_create(versions)
+
 
     def on_executors(self, packet):
         logger.info('%s: Updating runtimes', self.name)

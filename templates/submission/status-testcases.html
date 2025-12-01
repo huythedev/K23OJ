@@ -132,6 +132,15 @@
                     <td colspan="5" class="case-output">
                         <div class="case-info">
                             {% if can_view_test and curr_data %}
+                                <div style="margin-bottom: 5px">
+                                    <a class="btn btn-default btn-xs" href="{{ url('submission_testcase_download', submission.id, case.case, 'input') }}">
+                                        <i class="fa fa-download"></i> .INP
+                                    </a>
+                                    <a class="btn btn-default btn-xs" href="{{ url('submission_testcase_download', submission.id, case.case, 'output') }}">
+                                        <i class="fa fa-download"></i> .OUT
+                                    </a>
+                                </div>
+
                                 <strong>{{ _('Input:') }}</strong>
                                 <pre class="case-output">{{ curr_data['input']|linebreaksbr }}</pre>
                                 <strong>{{ _('Answer:') }}</strong>

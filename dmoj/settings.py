@@ -92,7 +92,7 @@ VNOJ_TESTCASE_HARD_LIMIT = 100
 # they will receive a warning
 VNOJ_TESTCASE_SOFT_LIMIT = 50
 # Minimum problem count required to interact (comment, vote and update profile)
-VNOJ_INTERACT_MIN_PROBLEM_COUNT = 5
+VNOJ_INTERACT_MIN_PROBLEM_COUNT = 0
 # Minimum problem count required to create new blogs
 VNOJ_BLOG_MIN_PROBLEM_COUNT = 10
 
@@ -313,7 +313,7 @@ else:
 
     WPADMIN = {
         'admin': {
-            'title': 'DMOJ Admin',
+            'title': 'K23OJ Admin',
             'menu': {
                 'top': 'wpadmin.menu.menus.BasicTopMenu',
                 'left': 'wpadmin.menu.custom.CustomModelLeftMenuWithDashboard',
@@ -782,3 +782,7 @@ try:
         exec(f.read(), globals())
 except IOError:
     pass
+
+USE_X_FORWARDED_HOST = True
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024 * 1024  # 10GB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 256 * 1024 * 1024        # 256MB in-memory, then use temp files

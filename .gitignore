@@ -43,3 +43,9 @@ tmp.sh
 fc_*
 local_urls.py
 celerybeat-schedule.*
+/media
+/problems
+batman.yml
+captainamerica.yml
+spiderman.yml
+superman.yml

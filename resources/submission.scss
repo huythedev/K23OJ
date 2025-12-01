@@ -203,14 +203,79 @@ label[for="language"], label[for="status"], label[for="organization"] {
     margin: 0;
     padding: 0;
     white-space: pre;
+    font-family: $monospace-fonts;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.source-ln {
+    vertical-align: top;
+    padding-right: 10px;
+    user-select: none;
+    
+    > div {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    pre {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        line-height: 1.6;
+        font-family: $monospace-fonts;
+        font-size: 14px;
+        color: $color_primary50;
+        text-align: right;
+    }
 }
 
 .source-code {
     padding-left: 15px;
+    width: 100%;
+    vertical-align: top;
+    border-left: 1px solid $color_primary25;
+    
+    .codehilite {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    pre {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0 !important;
+        font-family: $monospace-fonts !important;
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+    }
+    
+    code {
+        font-family: $monospace-fonts !important;
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+    }
 }
 
 .source-wrap {
     overflow-x: auto;
+    background: $color_primary5;
+    border-radius: $widget_border_radius_lg;
+    padding: $spacing-4;
+}
+
+.source-table {
+    width: 100%;
+    border-collapse: collapse;
+    
+    td {
+        padding: 0;
+        vertical-align: top;
+    }
 }
 
 .statistics-table {
@@ -225,6 +290,12 @@ label[for="language"], label[for="status"], label[for="organization"] {
 }
 
 #test-cases {
+    text-align: left;
+    
+    h3 {
+        text-align: left;
+    }
+    
     .toggle .fa {
         margin-left: -1.28571em;
     }
@@ -294,8 +365,9 @@ label[for="language"], label[for="status"], label[for="organization"] {
 }
 
 .case-AC {
-    color: green;
-    font-weight: bold;
+  color: green;
+  /* color: red; */
+  font-weight: bold;
 }
 
 .case-_AC {
@@ -304,8 +376,9 @@ label[for="language"], label[for="status"], label[for="organization"] {
 }
 
 .case-WA {
-    color: red;
-    font-weight: bold;
+    color: red; 
+    /* color: green; */
+  font-weight: bold;
 }
 
 .case-TLE, .case-SC {
@@ -323,8 +396,12 @@ label[for="language"], label[for="status"], label[for="organization"] {
 }
 
 .half-hr {
-    float: left;
     width: 30%;
+    clear: both;
+}
+
+#test-cases {
+    clear: both;
 }
 
 .source-wrap {

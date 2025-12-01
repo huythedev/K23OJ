@@ -1,5 +1,7 @@
 import json
 import os
+import zipfile
+import yaml
 from collections import namedtuple
 from itertools import groupby
 from operator import attrgetter
@@ -24,7 +26,7 @@ from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import DetailView, ListView
 
 from judge.highlight_code import highlight_code
-from judge.models import Contest, Language, Organization, Problem, ProblemTranslation, Profile, Submission
+from judge.models import Contest, Language, Organization, Problem, ProblemTranslation, Profile, Submission, problem_data_storage
 from judge.models.problem import ProblemTestcaseResultAccess, SubmissionSourceAccess
 from judge.utils.infinite_paginator import InfinitePaginationMixin
 from judge.utils.lazy import memo_lazy
@@ -836,3 +838,55 @@ class UserContestSubmissions(ForceContestMixin, UserProblemSubmissions):
             contest=format_html('<a href="{1}">{0}</a>', self.contest.name,
                                 reverse('contest_view', args=[self.contest.key])),
         ))
+
+@login_required
+def download_testcase(request, submission_id, testcase_id, type):
+    submission = get_object_or_404(Submission, id=submission_id)
+    if not submission.problem.is_testcase_accessible_by(request.user):
+        raise PermissionDenied()
+
+    try:
+        testcase_id = int(testcase_id)
+    except ValueError:
+        raise Http404()
+
+    cases = submission.problem.cases.all().order_by('order')
+    valid_cases = [c for c in cases if c.input_file]
+    
+    if testcase_id < 1 or testcase_id > len(valid_cases):
+        raise Http404()
+        
+    case = valid_cases[testcase_id - 1]
+    
+    filename = case.input_file if type == 'input' else case.output_file
+    if not filename:
+        raise Http404()
+
+    problem = submission.problem
+    init_path = '%s/init.yml' % problem.code
+    if not problem_data_storage.exists(init_path):
+        raise Http404()
+
+    init_content = yaml.safe_load(problem_data_storage.open(init_path).read())
+    archive_path = init_content.get('archive', None)
+    if not archive_path:
+        raise Http404()
+
+    archive_path = '%s/%s' % (problem.code, archive_path)
+    if not problem_data_storage.exists(archive_path):
+        raise Http404()
+
+    try:
+        with problem_data_storage.open(archive_path) as f:
+            with zipfile.ZipFile(f) as archive:
+                try:
+                    content = archive.read(filename)
+                except KeyError:
+                    raise Http404()
+    except zipfile.BadZipfile:
+        raise Http404()
+
+    response = HttpResponse(content, content_type='text/plain')
+    download_filename = '%s_%d.%s' % (problem.code, testcase_id, 'inp' if type == 'input' else 'out')
+    response['Content-Disposition'] = 'attachment; filename="%s"' % download_filename
+    return response

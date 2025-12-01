@@ -1,5 +1,6 @@
 @use "vars" as *;
 
+// Modern Problem Tables
 #tagproblem-table, #tag-table {
     td, th {
         &.problem-name {
@@ -24,10 +25,14 @@
     }
 
     tr {
-        transition: background-color linear 0.2s;
+        transition: all $transition-fast;
 
         &:hover {
-            background: rgba($color_primary100, 0.05);
+            background: rgba($highlight_blue, 0.05);
+            
+            td {
+                color: $color_primary100;
+            }
         }
     }
 }
@@ -35,11 +40,16 @@
 #tagproblem-table {
     .row-tag-list {
         font-size: 0.75em;
-        padding-top: 1px;
+        padding-top: $spacing-1;
         text-align: right;
 
         &, a {
-            color: grey !important;
+            color: $color_primary50 !important;
+            transition: color $transition-fast;
+        }
+        
+        a:hover {
+            color: $highlight_blue !important;
         }
     }
 }
@@ -49,52 +59,73 @@
         // Text columns are left-aligned
         &.problem-code, &.problem-name, &.category, &.types {
             text-align: left;
-            padding: 0 1rem;
+            padding: $spacing-3 $spacing-4;
         }
 
         // Numeric columns are center-aligned
         &.solved, &.points, &.ac-rate, &.editorial, &.users {
-            padding: 0 10px;
+            padding: $spacing-3 $spacing-4;
             white-space: nowrap;
         }
 
         &.problem-code {
             word-break: break-all;
+            font-family: $monospace-fonts;
+            font-weight: 500;
         }
     }
 
     th a {
         color: inherit;
+        transition: opacity $transition-fast;
+        
+        &:hover {
+            opacity: 0.8;
+        }
     }
 
     tr {
-        transition: background-color linear 0.2s;
+        transition: all $transition-fast;
 
         &:hover {
-            background: rgba($color_primary100, 0.05);
+            background: rgba($highlight_blue, 0.05);
         }
     }
 }
 
+// Modern Filter Form
 #filter-form {
     vertical-align: top;
-    margin-bottom: 0.5em;
-    margin-top: 0.75em;
+    margin-bottom: $spacing-4;
+    margin-top: $spacing-4;
+    padding: $spacing-4;
+    background: $color_primary0;
+    border-radius: $widget_border_radius_lg;
+    border: 1px solid $color_primary25;
+    box-shadow: $shadow-sm;
 
     a {
-        margin-right: 5px;
+        margin-right: $spacing-2;
         display: inline-block;
-        padding: 3px 10px;
+        padding: $spacing-2 $spacing-4;
         vertical-align: middle;
+        border-radius: $widget_border_radius;
+        transition: all $transition-fast;
+        
+        &:hover {
+            background: $color_primary5;
+        }
     }
 
     input {
         vertical-align: middle;
-        margin-bottom: 0.5em;
+        margin-bottom: $spacing-2;
     }
 
     label {
         vertical-align: middle;
+        font-weight: 500;
+        color: $color_primary75;
     }
 
     .filter-form-group {

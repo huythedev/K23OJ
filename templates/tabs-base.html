@@ -6,12 +6,13 @@
     </li>
 {% endmacro %}
 
-<div class="tabs">
+<div class="tabs" style="display: flex; align-items: center; width: 100%;">
     {% if not left_align_tabs %}
-        <h2>{{ content_title or title }}</h2>
+        <h2 style="margin: 0;">{{ content_title or title }}</h2>
+        <div style="flex-grow: 1;"></div>
     {% endif %}
     {% block post_tab_spacer %}{% endblock %}
-    <ul>
+    <ul style="margin: 0;">
         {% block tabs %}{% endblock %}
     </ul>
 </div>
