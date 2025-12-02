@@ -7,6 +7,7 @@ import markdown2
 from bleach.css_sanitizer import CSSSanitizer
 from bleach.sanitizer import Cleaner
 from django.conf import settings
+from django.utils.module_loading import import_string
 from lxml import html
 from lxml.etree import ParserError, XMLSyntaxError
 from markupsafe import Markup
@@ -103,6 +104,13 @@ def markdown(text, style, math_engine=None, lazy_load=False, strip_paragraphs=Fa
     bleach_params = styles.get('bleach', {})
 
     post_processors = []
+    if hasattr(settings, 'POST_PROCESSORS'):
+        for name, path in settings.POST_PROCESSORS.items():
+            try:
+                post_processors.append(import_string(path))
+            except ImportError:
+                logger.warning('Failed to import post processor %s', path)
+
     if styles.get('use_camo', False) and camo_client is not None:
         post_processors.append(camo_client.update_tree)
     if lazy_load:
