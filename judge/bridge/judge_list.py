@@ -42,8 +42,8 @@ class JudgeList(object):
             while node:
                 if isinstance(node.value, PriorityMarker):
                     priority = node.value.priority + 1
-                elif priority >= REJUDGE_PRIORITY and self.should_reserve_judge():
-                    return
+                # elif priority >= REJUDGE_PRIORITY and self.should_reserve_judge():
+                #     return
                 else:
                     id, problem, language, source, judge_id, banned_judges = node.value
                     if judge.name not in banned_judges and judge.can_judge(problem, language, judge_id):
@@ -197,8 +197,8 @@ class JudgeList(object):
             else:
                 logger.info('Free judges: %d', len(available))
 
-            if len(candidates) > 1 and len(available) == 1 and priority >= REJUDGE_PRIORITY:
-                available = []
+            # if len(candidates) > 1 and len(available) == 1 and priority >= REJUDGE_PRIORITY:
+            #     available = []
 
             if available:
                 # Schedule the submission on the judge reporting least load.
