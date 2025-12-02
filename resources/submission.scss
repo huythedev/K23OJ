@@ -178,7 +178,7 @@ label[for="language"], label[for="status"], label[for="organization"] {
 .source-ln {
     color: $color_primary50;
     border-right: 1px solid $color_primary50;
-    padding-right: 5px;
+    padding-right: 10px !important;
     text-align: right;
 
     a {
@@ -210,7 +210,6 @@ label[for="language"], label[for="status"], label[for="organization"] {
 
 .source-ln {
     vertical-align: top;
-    padding-right: 10px;
     user-select: none;
     
     > div {
@@ -233,7 +232,7 @@ label[for="language"], label[for="status"], label[for="organization"] {
 }
 
 .source-code {
-    padding-left: 15px;
+    padding-left: 10px !important;
     width: 100%;
     vertical-align: top;
     border-left: 1px solid $color_primary25;
