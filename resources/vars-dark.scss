@@ -3,11 +3,11 @@
 $is_light_theme: false;
 
 // Modern Dark Theme Colors
-$color_primary0: #0a0a0b;
-$color_primary5: #111113;      // light background
-$color_primary10: #18181b;     // background
-$color_primary25: #27272a;     // border
-$color_primary33: #3f3f46;     // widget
+$color_primary0: #121214;
+$color_primary5: #1c1c1e;      // light background
+$color_primary10: #242427;     // background
+$color_primary25: #323236;     // border
+$color_primary33: #4a4a52;     // widget
 $color_primary50: #71717a;
 $color_primary66: #a1a1aa;     // tabs
 $color_primary75: #d4d4d8;     // widget
@@ -20,12 +20,12 @@ $color_link75: #a5b4fc;    // default - lighter indigo
 $color_link100: #c7d2fe;   // hover
 $color_link200: #fbbf24;   // active - amber
 
-$color_pageBg: #0f0f10;
+$color_pageBg: #18181b;
 
 // Semantic Colors
 $color_contest_ranking_disqualified: #450a0a;
 
-$color_martor_resize_dragger: #27272a;
+$color_martor_resize_dragger: #323236;
 
 // Rating Colors - More vibrant for dark mode
 $color_rating_none: #a1a1aa;
@@ -40,7 +40,7 @@ $color_rating_grandmaster: #f87171;
 $color_select2_search_dropdown: $color_primary10;
 
 // Activity Heatmap
-$color_user_submission_activity0: #27272a;
+$color_user_submission_activity0: #323236;
 $color_user_submission_activity1: #14532d;
 $color_user_submission_activity2: #166534;
 $color_user_submission_activity3: #22c55e;
