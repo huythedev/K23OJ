@@ -429,6 +429,19 @@
     </noscript>
     <br>
     <main id="content">
+        <div id="alt-site-notice" style="background-color: #ffecb3; color: #664d03; padding: 0.75rem 1.25rem; margin-bottom: 1rem; border: 1px solid #ffdf7e; border-radius: 0.25rem; text-align: center; display: none; position: relative;">
+            <i class="fa fa-info-circle"></i> {{ _('Experiencing slow loading speeds? Try alternative address:') }} <a href="https://huythedev.ddns.net:7749" style="font-weight: bold; color: #664d03; text-decoration: underline;">https://huythedev.ddns.net:7749</a>
+            <button onclick="dismissAltSiteNotice()" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #664d03 !important; font-size: 1.2em;" title="{{ _('Dismiss') }}">&times;</button>
+        </div>
+        <script>
+            if (!localStorage.getItem('dismissed_alt_site_notice')) {
+                document.getElementById('alt-site-notice').style.display = 'block';
+            }
+            function dismissAltSiteNotice() {
+                document.getElementById('alt-site-notice').style.display = 'none';
+                localStorage.setItem('dismissed_alt_site_notice', 'true');
+            }
+        </script>
         {% if misc_config.top_notification %}
             {{ render_django(misc_config.top_notification) }}
         {% endif %}
@@ -459,7 +472,8 @@
                 dmoj=safe('<a style="color: #808080" href="https://dmoj.ca"><b>DMOJ</b></a>'),
                 vnoj=safe('<a style="color: #808080" href="https://oj.vnoi.info"><b>VNOJ</b></a>')) }} |
             {{ _('follow us on %(facebook)s',
-                facebook=safe('<a style="color: #808080" href="https://www.facebook.com/profile.php?id=61564628423543"><b>Facebook</b></a>')) }}
+                facebook=safe('<a style="color: #808080" href="https://www.facebook.com/profile.php?id=61564628423543"><b>Facebook</b></a>')) }} |
+            <a style="color: #808080" href="https://huythedev.ddns.net:7749"><b>{{ _('Alternative Site') }}</b></a>
             {% if misc_config.footer %}
                 {{ misc_config.footer|safe }} |
             {% endif %}
