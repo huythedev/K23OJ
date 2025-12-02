@@ -37,14 +37,67 @@ form .martor-preview {
         display: none !important;
     }
 
-    .tab-martor-menu a.item {
-        font-size: 0.8rem;
+    .ui.top.attached.tabular.pointing.secondary.menu.tab-martor-menu {
+        background: transparent !important;
+        border-bottom-color: $color_primary25 !important;
+
+        &.inverted {
+            border-bottom-color: #27272a !important;
+        }
+
+        a.item {
+            font-size: 0.8rem;
+            color: $color_primary66 !important;
+
+            &.active {
+                color: $color_primary90 !important;
+                border-color: $color_primary90 !important;
+            }
+
+            &:hover {
+                color: $color_primary90 !important;
+            }
+        }
+
+        &.inverted a.item {
+            color: #a1a1aa !important;
+
+            &.active {
+                color: #e4e4e7 !important;
+                border-color: #e4e4e7 !important;
+            }
+
+            &:hover {
+                color: #e4e4e7 !important;
+            }
+        }
     }
 
     .martor-toolbar {
         flex: 0 1 auto !important;
         overflow-x: auto;
         overflow-y: hidden;
+
+        // Increase specificity to override Semantic UI !important on inverted buttons
+        &.item .ui.button, &.item .ui.buttons .button {
+            background: transparent !important;
+            color: $color_primary66 !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 0.5em !important;
+
+            &:hover {
+                color: $color_primary90 !important;
+            }
+        }
+
+        &.inverted.item .ui.button, &.inverted.item .ui.buttons .button {
+            color: #a1a1aa !important;
+
+            &:hover {
+                color: #e4e4e7 !important;
+            }
+        }
     }
 
     .martor-field {

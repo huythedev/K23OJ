@@ -32,6 +32,18 @@
         };
 
         var isDarkMode = function () {
+            var localStorageTheme = localStorage.getItem('theme');
+            if (localStorageTheme === 'dark') {
+                return true;
+            } else if (localStorageTheme === 'light') {
+                return false;
+            }
+
+            var themeLink = document.getElementById('theme-style');
+            if (themeLink && window.darkTheme) {
+                return themeLink.href.indexOf(window.darkTheme) !== -1;
+            }
+
             var theme = $('body').data('theme');
             if (theme === 'auto') {
                 return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -54,19 +66,35 @@
             var setupTheme = function () {
                 if (isDarkMode()) {
                     mainMartor.find('.ui').addClass('inverted');
+                    mainMartor.find('.martor-toolbar').addClass('inverted');
+                    mainMartor.find('.ui.menu').addClass('inverted');
                     editor.setTheme('ace/theme/twilight');
                 }
                 else {
                     mainMartor.find('.ui').removeClass('inverted');
+                    mainMartor.find('.martor-toolbar').removeClass('inverted');
+                    mainMartor.find('.ui.menu').removeClass('inverted');
                     editor.setTheme('ace/theme/github');
                 }
             }
 
             setupTheme();
+            
+            // Re-check theme periodically to ensure it stays in sync
+            setInterval(setupTheme, 1000);
+
             if ($('body').data('theme') === 'auto' && window.matchMedia) {
                 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
                     setupTheme();
                 });
+            }
+
+            var themeLink = document.getElementById('theme-style');
+            if (themeLink) {
+                var observer = new MutationObserver(function(mutations) {
+                    setupTheme();
+                });
+                observer.observe(themeLink, { attributes: true, attributeFilter: ['href'] });
             }
 
             editor.getSession().setMode('ace/mode/markdown');
