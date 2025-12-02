@@ -6,7 +6,7 @@ node scripts/check-package-installed.js postcss sass autoprefixer || exit
 build_style() {
   echo "Creating $1 style..."
   cp resources/vars-$1.scss resources/vars.scss
-  npx sass resources:sass_processed
+  npx sass resources:sass_processed --style=compressed --no-source-map
   npx postcss \
       sass_processed/ace-dmoj.css \
       sass_processed/featherlight.css \

@@ -6,16 +6,19 @@
     {% if misc_config.meta_keywords %}
         <meta name="keywords" content="{{ misc_config.meta_keywords }}">
     {% endif %}
-    {% if meta_description %}
-        <meta name="description" property="og:description" content="{{ meta_description }}">
-    {% endif %}
     <meta id="viewport" name="viewport" content="width=device-width, initial-scale=1">
     
-    <!-- Modern Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    
+    <!-- Modern Fonts (Self-hosted) -->
+    <link rel="preload" href="{{ static('fonts.css') }}" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="{{ static('fonts.css') }}"></noscript>
+    <link rel="preload" href="/static/fonts/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2" as="font" type="font/woff2" crossorigin>
+
+    <script>
+        if (localStorage.getItem('dismissed_alt_site_notice')) {
+            document.write('<style>#alt-site-notice { display: none !important; }</style>');
+        }
+    </script>
+
     <!-- Favicons-->
     <link rel="apple-touch-icon" sizes="57x57" href="/apple-touch-icon-57x57.png">
     <link rel="apple-touch-icon" sizes="60x60" href="/apple-touch-icon-60x60.png">
@@ -49,7 +52,7 @@
     <meta property="og:url"
           content="{{ DMOJ_SCHEME }}://{{ DMOJ_CANONICAL|default(site.domain) }}{{ request.get_full_path() }}">
 
-    <meta name="description" property="og:description" content="{{ meta_description }}">
+    <meta name="description" property="og:description" content="{{ meta_description|default("K23OJ is an online judge system for competitive programming.") }}">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -149,6 +152,216 @@
         </style>
     {% endif %}
     {% block media %}{% endblock %}
+    <noscript>
+        <style>
+            #content {
+                margin: 80px auto auto;
+            }
+
+            #navigation {
+                top: 27px;
+            }
+        </style>
+    </noscript>
+
+    <!-- Google Structured Data for Logo -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "url": "https://k23oj.io.vn",
+      "logo": "https://k23oj.io.vn/static/icons/logo.png",
+      "name": "K23OJ Online Judge"
+    }
+    </script>
+</head>
+<body{% if perms.judge.test_site %} data-theme="{{ SITE_THEME_NAME }}"{% endif %}>
+<svg width="0" height="0" style="display: block">
+    <defs>
+        <clipPath id="rating-clip"><circle cx="8" cy="8" r="7"/></clipPath>
+    </defs>
+</svg>
+<nav id="navigation" class="unselectable">
+    <div id="nav-container">
+        <a id="navicon" href="javascript:void(0)" role="button" aria-label="{{ _('Toggle Navigation') }}"><i class="fa fa-bars"></i></a>
+        <ul id="nav-list">
+            {% if request.organization is not defined %}
+                <li class="home-nav-element"><a href="{{ url('home') }}">{% include "site-logo-fragment.html" %}</a></li>
+                <li class="home-nav-element"><span class="nav-divider"></span></li>
+                <li class="home-menu-item"><a href="{{ url('home') }}" class="nav-home">{{ _('Home') }}</a></li>
+                {% for node in mptt_tree(nav_bar) recursive %}
+                    <li>
+                        <a href="{{ node.path }}" class="nav-{{ node.key }}{% if node.key in nav_tab %} active{% endif %}">
+                            {{ _(node.label) }}
+                            {% if not node.is_leaf_node() %}
+                                <div class="nav-expand">&gt;</div>
+                            {% endif %}
+                        </a>
+                        {% with children=node.get_children() %}
+                            {% if children %}<ul>{{ loop(children) }}</ul>{% endif %}
+                        {% endwith %}
+                    </li>
+                {% endfor %}
+            {% else %}
+                {% macro make_navbar_item(key, url, text) %}
+                    <li>
+                        <a href="{{ url }}" class="nav-{{ key }}"><span>
+                            {{ text }}
+                        </a>
+                    </li>
+                {% endmacro %}
+                {% set org = request.organization %}
+                <li class="home-nav-element"><a href="{{ url('organization_home', org.slug) }}">{% include "site-logo-fragment.html" %}</a></li>
+                <li class="home-nav-element"><span class="nav-divider"></span></li>
+                {{ make_navbar_item('problem-list', url('problem_list_organization', org.slug), _('PRoblems')) }}
+                {{ make_navbar_item('submission-list', url('submission_list_organization', org.slug), _('Submissions')) }}
+                {{ make_navbar_item('contest-list',  url('contest_list_organization', org.slug), _('Contests')) }}
+                {{ make_navbar_item('users',org.get_users_url(), _('Users')) }}
+            {% endif %}
+        </ul>
+
+        <span id="user-links">
+            <a href="javascript:toggleTheme()" role="button" style="margin-right: 10px; text-decoration: none;" aria-label="{{ _('Toggle light/dark mode') }}" title="{{ _('Toggle light/dark mode') }}">
+                <span id="theme-icon" style="font-size: 1.2em;">🌙</span>
+            </a>
+            <a href=
+                {% if request.resolver_match.view_name == "problem_detail" and problem %}
+                    "{{ url('new_problem_ticket', problem.code) }}"
+                {% else %}
+                    "/tickets/new?issue_url={{ request.build_absolute_uri()|urlencode }}"
+                {% endif %}
+            style="margin-right: 5px;" aria-label="{{ _('Report issue') }}">
+                <span title="{{ _('Report issue') }}">
+                    <i class="fa fa-exclamation-triangle" style="color: yellow;"></i>
+                </span>
+            </a>
+            <a id="flag_vi" href="#" onclick="submmit_language('vi')" style="margin-right: 5px; margin-top: 4px;">
+                <img src="{{ static('icons/vi_flag.svg') }}" alt="VI" width="24" height="24">
+            </a>
+            <a id="flag_en" href="#" onclick="submmit_language('en')" style="margin-right: 5px; margin-top: 4px;">
+                <img src="{{ static('icons/gb_flag.svg') }}" alt="EN" width="24" height="24">
+            </a>
+            {% if request.user.is_authenticated %}
+                <ul>
+                    <li>
+                        <a href="{{ url('user_page') }}">
+                            <span>
+                                <img src="{{ gravatar(request.user, 32) }}" height="24" width="24">{# -#}
+                                <span>{{ _('Hello, %(username)s.', username=bold(request.user.first_name or request.profile.display_name)) }}</span>
+                            </span>
+                        </a>
+                        <ul style="width: 150px">
+                            {% if request.user.is_staff or request.user.is_superuser %}
+                                <li><a href="{{ url('admin:index') }}">{{ _('Admin') }}</a></li>
+                            {% endif %}
+                            <li><a href="{{ url('user_edit_profile') }}">{{ _('Edit profile') }}</a></li>
+                            {% if request.user.is_impersonate %}
+                                <li><a href="{{ url('impersonate-stop') }}">{{ _('Stop impersonating') }}</a></li>
+                            {% else %}
+                                <li>
+                                    <form action="{{ url('auth_logout') }}" method="POST">
+                                        {% csrf_token %}
+                                        <button type="submit">{{ _('Log out') }}</button>
+                                    </form>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </li>
+                </ul>
+            {% else %}
+                <span class="anon">
+                    <a href="{{ url('auth_login') }}?next={{ LOGIN_RETURN_PATH|urlencode }}"><b>{{ _('Log in') }}</b></a>
+                    {% if REGISTRATION_OPEN %}
+                        &nbsp;{{ _('or') }}&nbsp;
+                        <a href="{{ url('registration_register') }}"><b>{{ _('Sign up') }}</b></a>
+                    {% endif %}
+                </span>
+            {% endif %}
+        </span>
+    </div>
+    <!-- <div id="nav-shadow"></div> -->
+</nav>
+{% if request.in_contest %}
+    {% set current_contest = request.participation.contest %}
+    <div id="contest-info">
+        <a href="{{ url('contest_view', current_contest.key) }}">
+            {{ current_contest.name }} -
+            {% if request.participation.spectate %}
+                {{ _('spectating') }}
+            {% elif request.participation.end_time %}
+                <div id="contest-time-remaining" data-secs="{{ request.participation.time_remaining|seconds }}">
+                    {{ request.participation.time_remaining|timedelta("localized") }}
+                </div>
+            {% else %}
+                {{ _('virtual') }}
+            {% endif %}
+        </a>
+        {% if current_contest.can_see_own_scoreboard(request.user) %}
+            <a href="{{ url('contest_ranking', current_contest.key) }}" style="text-align: center; font-size: 0.7em; color: #DCD427;">
+                {{ _('Go to Rankings') }}
+            </a>
+        {% endif %}
+    </div>
+{% endif %}
+<div id="page-container">
+    <noscript>
+        <div id="noscript">{{ _('This site works best with JavaScript enabled.') }}</div>
+    </noscript>
+    <br>
+    <main id="content">
+        <div id="alt-site-notice" style="background-color: #ffecb3; color: #664d03; padding: 0.75rem 1.25rem; margin-bottom: 1rem; border: 1px solid #ffdf7e; border-radius: 0.25rem; text-align: center; position: relative;">
+            <i class="fa fa-info-circle"></i> {{ _('Experiencing slow loading speeds? Try alternative address:') }} <a href="https://huythedev.ddns.net:7749" style="font-weight: bold; color: #664d03; text-decoration: underline;">https://huythedev.ddns.net:7749</a>
+            <button onclick="dismissAltSiteNotice()" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #664d03 !important; font-size: 1.2em;" title="{{ _('Dismiss') }}">&times;</button>
+        </div>
+        <script>
+            function dismissAltSiteNotice() {
+                document.getElementById('alt-site-notice').style.display = 'none';
+                localStorage.setItem('dismissed_alt_site_notice', 'true');
+            }
+        </script>
+        {% if misc_config.top_notification %}
+            {{ render_django(misc_config.top_notification) }}
+        {% endif %}
+        {% block title_row %}
+            <h2 style="display:inline">
+                {% block content_title %}
+                    {% if content_title %}{{ content_title }}{% else %}{{ title }}{% endif %}
+                {% endblock %}
+            </h2>
+        {% endblock %}
+        {% block header %}{% endblock %}
+        {% block title_ruler %}
+            <hr>
+        {% endblock %}
+        <div id="content-body">{% block body %}{% endblock %}</div>
+    </main>
+
+    {% if misc_config.announcement %}
+        <div id="announcement">{{ misc_config.announcement|safe }}</div>
+    {% endif %}
+
+    {% block bodyend %}{% endblock %}
+
+    <footer>
+        <span id="footer-content">
+            <br>
+            {{ _('proudly powered by %(dmoj)s and %(vnoj)s',
+                dmoj=safe('<a style="color: #808080" href="https://dmoj.ca"><b>DMOJ</b></a>'),
+                vnoj=safe('<a style="color: #808080" href="https://oj.vnoi.info"><b>VNOJ</b></a>')) }} |
+            {{ _('follow us on %(facebook)s',
+                facebook=safe('<a style="color: #808080" href="https://www.facebook.com/profile.php?id=61564628423543"><b>Facebook</b></a>')) }} |
+            <a style="color: #808080" href="https://huythedev.ddns.net:7749"><b>{{ _('Alternative Site') }}</b></a>
+            {% if misc_config.footer %}
+                {{ misc_config.footer|safe }} |
+            {% endif %}
+            <form id="set_language" action="{{ url('set_language') }}" method="post" style="display: inline">
+                {% csrf_token %}
+            <input name="next" type="hidden" value="{{ request.get_full_path() }}">
+            <input name="language" type="hidden" value="{{LANGUAGE_CODE}}">
+          </form>
+        </span>
+    </footer>
+</div>
     {% if not INLINE_JQUERY %}
         <script src="{{ JQUERY_JS }}"></script>
     {% endif %}
@@ -272,218 +485,5 @@
             }
         }
     </script>
-    <noscript>
-        <style>
-            #content {
-                margin: 80px auto auto;
-            }
-
-            #navigation {
-                top: 27px;
-            }
-        </style>
-    </noscript>
-
-    <!-- Google Structured Data for Logo -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "url": "https://k23oj.io.vn",
-      "logo": "https://k23oj.io.vn/static/icons/logo.png",
-      "name": "K23OJ Online Judge"
-    }
-    </script>
-</head>
-<body{% if perms.judge.test_site %} data-theme="{{ SITE_THEME_NAME }}"{% endif %}>
-<svg width="0" height="0" style="display: block">
-    <defs>
-        <clipPath id="rating-clip"><circle cx="8" cy="8" r="7"/></clipPath>
-    </defs>
-</svg>
-<nav id="navigation" class="unselectable">
-    <div id="nav-container">
-        <a id="navicon" href="javascript:void(0)"><i class="fa fa-bars"></i></a>
-        <ul id="nav-list">
-            {% if request.organization is not defined %}
-                <li class="home-nav-element"><a href="{{ url('home') }}">{% include "site-logo-fragment.html" %}</a></li>
-                <li class="home-nav-element"><span class="nav-divider"></span></li>
-                <li class="home-menu-item"><a href="{{ url('home') }}" class="nav-home">{{ _('Home') }}</a></li>
-                {% for node in mptt_tree(nav_bar) recursive %}
-                    <li>
-                        <a href="{{ node.path }}" class="nav-{{ node.key }}{% if node.key in nav_tab %} active{% endif %}">
-                            {{ _(node.label) }}
-                            {% if not node.is_leaf_node() %}
-                                <div class="nav-expand">&gt;</div>
-                            {% endif %}
-                        </a>
-                        {% with children=node.get_children() %}
-                            {% if children %}<ul>{{ loop(children) }}</ul>{% endif %}
-                        {% endwith %}
-                    </li>
-                {% endfor %}
-            {% else %}
-                {% macro make_navbar_item(key, url, text) %}
-                    <li>
-                        <a href="{{ url }}" class="nav-{{ key }}"><span>
-                            {{ text }}
-                        </a>
-                    </li>
-                {% endmacro %}
-                {% set org = request.organization %}
-                <li class="home-nav-element"><a href="{{ url('organization_home', org.slug) }}">{% include "site-logo-fragment.html" %}</a></li>
-                <li class="home-nav-element"><span class="nav-divider"></span></li>
-                {{ make_navbar_item('problem-list', url('problem_list_organization', org.slug), _('PRoblems')) }}
-                {{ make_navbar_item('submission-list', url('submission_list_organization', org.slug), _('Submissions')) }}
-                {{ make_navbar_item('contest-list',  url('contest_list_organization', org.slug), _('Contests')) }}
-                {{ make_navbar_item('users',org.get_users_url(), _('Users')) }}
-            {% endif %}
-        </ul>
-
-        <span id="user-links">
-            <a href="javascript:toggleTheme()" style="margin-right: 10px; text-decoration: none;" title="{{ _('Toggle light/dark mode') }}">
-                <span id="theme-icon" style="font-size: 1.2em;">🌙</span>
-            </a>
-            <a href=
-                {% if request.resolver_match.view_name == "problem_detail" and problem %}
-                    "{{ url('new_problem_ticket', problem.code) }}"
-                {% else %}
-                    "/tickets/new?issue_url={{ request.build_absolute_uri()|urlencode }}"
-                {% endif %}
-            style="margin-right: 5px;">
-                <span title="{{ _('Report issue') }}">
-                    <i class="fa fa-exclamation-triangle" style="color: yellow;"></i>
-                </span>
-            </a>
-            <a id="flag_vi" href="#" onclick="submmit_language('vi')" style="margin-right: 5px; margin-top: 4px;">
-                <img src="{{ static('icons/vi_flag.svg') }}" alt="VI" height="24">
-            </a>
-            <a id="flag_en" href="#" onclick="submmit_language('en')" style="margin-right: 5px; margin-top: 4px;">
-                <img src="{{ static('icons/gb_flag.svg') }}" alt="EN" height="24">
-            </a>
-            {% if request.user.is_authenticated %}
-                <ul>
-                    <li>
-                        <a href="{{ url('user_page') }}">
-                            <span>
-                                <img src="{{ gravatar(request.user, 32) }}" height="24" width="24">{# -#}
-                                <span>{{ _('Hello, %(username)s.', username=bold(request.user.first_name or request.profile.display_name)) }}</span>
-                            </span>
-                        </a>
-                        <ul style="width: 150px">
-                            {% if request.user.is_staff or request.user.is_superuser %}
-                                <li><a href="{{ url('admin:index') }}">{{ _('Admin') }}</a></li>
-                            {% endif %}
-                            <li><a href="{{ url('user_edit_profile') }}">{{ _('Edit profile') }}</a></li>
-                            {% if request.user.is_impersonate %}
-                                <li><a href="{{ url('impersonate-stop') }}">{{ _('Stop impersonating') }}</a></li>
-                            {% else %}
-                                <li>
-                                    <form action="{{ url('auth_logout') }}" method="POST">
-                                        {% csrf_token %}
-                                        <button type="submit">{{ _('Log out') }}</button>
-                                    </form>
-                                </li>
-                            {% endif %}
-                        </ul>
-                    </li>
-                </ul>
-            {% else %}
-                <span class="anon">
-                    <a href="{{ url('auth_login') }}?next={{ LOGIN_RETURN_PATH|urlencode }}"><b>{{ _('Log in') }}</b></a>
-                    {% if REGISTRATION_OPEN %}
-                        &nbsp;{{ _('or') }}&nbsp;
-                        <a href="{{ url('registration_register') }}"><b>{{ _('Sign up') }}</b></a>
-                    {% endif %}
-                </span>
-            {% endif %}
-        </span>
-    </div>
-    <!-- <div id="nav-shadow"></div> -->
-</nav>
-{% if request.in_contest %}
-    {% set current_contest = request.participation.contest %}
-    <div id="contest-info">
-        <a href="{{ url('contest_view', current_contest.key) }}">
-            {{ current_contest.name }} -
-            {% if request.participation.spectate %}
-                {{ _('spectating') }}
-            {% elif request.participation.end_time %}
-                <div id="contest-time-remaining" data-secs="{{ request.participation.time_remaining|seconds }}">
-                    {{ request.participation.time_remaining|timedelta("localized") }}
-                </div>
-            {% else %}
-                {{ _('virtual') }}
-            {% endif %}
-        </a>
-        {% if current_contest.can_see_own_scoreboard(request.user) %}
-            <a href="{{ url('contest_ranking', current_contest.key) }}" style="text-align: center; font-size: 0.7em; color: #DCD427;">
-                {{ _('Go to Rankings') }}
-            </a>
-        {% endif %}
-    </div>
-{% endif %}
-<div id="page-container">
-    <noscript>
-        <div id="noscript">{{ _('This site works best with JavaScript enabled.') }}</div>
-    </noscript>
-    <br>
-    <main id="content">
-        <div id="alt-site-notice" style="background-color: #ffecb3; color: #664d03; padding: 0.75rem 1.25rem; margin-bottom: 1rem; border: 1px solid #ffdf7e; border-radius: 0.25rem; text-align: center; display: none; position: relative;">
-            <i class="fa fa-info-circle"></i> {{ _('Experiencing slow loading speeds? Try alternative address:') }} <a href="https://huythedev.ddns.net:7749" style="font-weight: bold; color: #664d03; text-decoration: underline;">https://huythedev.ddns.net:7749</a>
-            <button onclick="dismissAltSiteNotice()" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #664d03 !important; font-size: 1.2em;" title="{{ _('Dismiss') }}">&times;</button>
-        </div>
-        <script>
-            if (!localStorage.getItem('dismissed_alt_site_notice')) {
-                document.getElementById('alt-site-notice').style.display = 'block';
-            }
-            function dismissAltSiteNotice() {
-                document.getElementById('alt-site-notice').style.display = 'none';
-                localStorage.setItem('dismissed_alt_site_notice', 'true');
-            }
-        </script>
-        {% if misc_config.top_notification %}
-            {{ render_django(misc_config.top_notification) }}
-        {% endif %}
-        {% block title_row %}
-            <h2 style="display:inline">
-                {% block content_title %}
-                    {% if content_title %}{{ content_title }}{% else %}{{ title }}{% endif %}
-                {% endblock %}
-            </h2>
-        {% endblock %}
-        {% block header %}{% endblock %}
-        {% block title_ruler %}
-            <hr>
-        {% endblock %}
-        <div id="content-body">{% block body %}{% endblock %}</div>
-    </main>
-
-    {% if misc_config.announcement %}
-        <div id="announcement">{{ misc_config.announcement|safe }}</div>
-    {% endif %}
-
-    {% block bodyend %}{% endblock %}
-
-    <footer>
-        <span id="footer-content">
-            <br>
-            {{ _('proudly powered by %(dmoj)s and %(vnoj)s',
-                dmoj=safe('<a style="color: #808080" href="https://dmoj.ca"><b>DMOJ</b></a>'),
-                vnoj=safe('<a style="color: #808080" href="https://oj.vnoi.info"><b>VNOJ</b></a>')) }} |
-            {{ _('follow us on %(facebook)s',
-                facebook=safe('<a style="color: #808080" href="https://www.facebook.com/profile.php?id=61564628423543"><b>Facebook</b></a>')) }} |
-            <a style="color: #808080" href="https://huythedev.ddns.net:7749"><b>{{ _('Alternative Site') }}</b></a>
-            {% if misc_config.footer %}
-                {{ misc_config.footer|safe }} |
-            {% endif %}
-            <form id="set_language" action="{{ url('set_language') }}" method="post" style="display: inline">
-                {% csrf_token %}
-            <input name="next" type="hidden" value="{{ request.get_full_path() }}">
-            <input name="language" type="hidden" value="{{LANGUAGE_CODE}}">
-          </form>
-        </span>
-    </footer>
-</div>
 </body>
 </html>
