@@ -9,6 +9,58 @@
 {% endblock %}
 
 {% block user_content %}
+    <div class="user-info-container">
+        <div class="user-info-card">
+            <div class="user-info">
+                <div class="user-info-header"><i class="fa fa-star rating {{ rating_class(rating) }} user"></i> {{ _('Rating') }}</div>
+                <div class="user-info-body rating {{ rating_class(rating) }} user">
+                    {% if ratings %}
+                        {{ rating_number(rating) }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="user-info-card">
+            <div class="user-info">
+                <div class="user-info-header" title="{{ _('Problems solved') }}"><i style="color: darkcyan;" class="fa fa-slack"></i> {{ _('Problems') }}</div>
+                <div class="user-info-body">{{ user.problem_count }}</div>
+            </div>
+        </div>
+        <div class="user-info-card">
+            <div class="user-info">
+                <div class="user-info-header" title="{{ _('Total points') }}"><i style="color:green" class="icofont-tick-mark"></i> {{ _('Points') }}</div>
+                <div class="user-info-body"><span title="{{ user.performance_points|floatformat(2) }}">
+                {{ user.performance_points|floatformat(0) }}
+            </span></div>
+            </div>
+        </div>
+        <div class="user-info-card">
+            <div class="user-info">
+                <div class="user-info-header" title="{{ _('Rank by rating') }}"><i style="color: peru" class="fa fa-globe"></i> {{ _('Rating') }}</div>
+                <div class="user-info-body">
+                    {% if ratings and not user.is_unlisted %}
+                        #{{ rating_rank }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="user-info-card">
+            <div class="user-info">
+                <div class="user-info-header" title="{{ _('Rank by points') }}"><i style="color: blue" class="fa fa-globe"></i> {{ _('Points') }}</div>
+                <div class="user-info-body">
+                    {% if not user.is_unlisted %}
+                        #{{ rank }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="content-description">
         {% with orgs=user.organizations.filter(is_unlisted=False) %}
             {% if orgs %}
