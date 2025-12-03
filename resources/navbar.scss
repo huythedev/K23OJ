@@ -80,8 +80,7 @@
 }
 
 #nav-shadow {
-    height: 4px;
-    background: linear-gradient(rgba(0, 0, 0, 0.15), transparent);
+    display: none;
 }
 
 #nav-container {
@@ -97,6 +96,7 @@ nav {
     right: 0;
     z-index: 500;
     background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 
     ul {
         margin: 0 0 0 -5px;
