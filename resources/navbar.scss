@@ -366,3 +366,10 @@ nav {
         }
     }
 }
+
+#nav-list {
+    .nav-problems, .nav-submit, .nav-user, .nav-contest, .nav-about, .nav-org {
+        border-radius: 0;
+    }
+}
+
