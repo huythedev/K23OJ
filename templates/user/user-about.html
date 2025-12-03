@@ -29,8 +29,8 @@
             {% endwith %}
         {% endif %}
 
+        <h4>{{ _('About') }}</h4>
         {% if user.about %}
-            <h4>{{ _('About') }}</h4>
             {% cache 86400 'user_about' user.id MATH_ENGINE %}
                 {{ user.about|markdown('self-description', MATH_ENGINE)|reference|str|safe }}
             {% endcache %}
@@ -56,72 +56,72 @@
         {% endfor %}
 
         <h4 id="submission-activity-header"></h4>
-        <div id="submission-activity" style="display: none;">
+        <div id="submission-activity">
             <div id="submission-activity-actions">
-                <a href="javascript:void(0)" id="prev-year-action">&laquo;</a>
+                <a href="javascript:void(0)" id="prev-year-action" style="display: none;">&laquo;</a>
                 &nbsp;<span id="year"></span>&nbsp;
-                <a href="javascript:void(0)" id="next-year-action">&raquo;</a>
+                <a href="javascript:void(0)" id="next-year-action" style="display: none;">&raquo;</a>
             </div>
             <div id="submission-activity-display">
                 <table id="submission-activity-table">
+                    <tbody>
                     <tr id="submission-0">
                         <th class="submission-date-col info-text">
-                            {{ _('Sun') }}
+                            Sun
                         </th>
                     </tr>
                     <tr id="submission-1">
                         <th class="submission-date-col info-text">
-                            {{ _('Mon') }}
+                            Mon
                         </th>
                     </tr>
                     <tr id="submission-2">
                         <th class="submission-date-col info-text">
-                            {{ _('Tues') }}
+                            Tues
                         </th>
                     </tr>
                     <tr id="submission-3">
                         <th class="submission-date-col info-text">
-                            {{ _('Wed') }}
+                            Wed
                         </th>
                     </tr>
                     <tr id="submission-4">
                         <th class="submission-date-col info-text">
-                            {{ _('Thurs') }}
+                            Thurs
                         </th>
                     </tr>
                     <tr id="submission-5">
                         <th class="submission-date-col info-text">
-                            {{ _('Fri') }}
+                            Fri
                         </th>
                     </tr>
                     <tr id="submission-6">
                         <th class="submission-date-col info-text">
-                            {{ _('Sat') }}
+                            Sat
                         </th>
                     </tr>
+                    </tbody>
                 </table>
                 <div class="info-bar">
-                    <span id="submission-total-count" class="info-text">
-                    </span>
+                    <span id="submission-total-count" class="info-text"></span>
                     <table class="info-table">
-                        <tr>
-                            <th class="info-table-text info-text">{{ _('Less') }}</th>
+                        <tbody><tr>
+                            <th class="info-table-text info-text">Less</th>
                             <td class="activity-0"><div></div></td>
                             <td class="activity-1"><div></div></td>
                             <td class="activity-2"><div></div></td>
                             <td class="activity-3"><div></div></td>
                             <td class="activity-4"><div></div></td>
-                            <th class="info-table-text info-text">{{ _('More') }}</th>
-                        <tr>
-                    </table>
+                            <th class="info-table-text info-text">More</th>
+                        </tr><tr>
+                    </tr></tbody></table>
                 </div>
             </div>
         </div>
 
-        {% if rating %}
-            <h4>{{ _('Rating history') }}</h4>
+            <h4>Rating history</h4>
             <div id="rating-chart">
-                <canvas></canvas>
+                <canvas style="display: block; width: 1185px; height: 400px;" width="1185" height="400"></canvas>
             </div>
             <div id="rating-tooltip">
                 <div class="contest"></div>
@@ -131,11 +131,10 @@
                     <span class="rating"></span>, #<span class="rank"></span>
                 </div>
             </div>
-        {% endif %}
     </div>
 {% endblock %}
 
-{% block bodyend %}
+{% block user_js_media %}
     {% if REQUIRE_JAX %}
         {% include "mathjax-load.html" %}
     {% endif %}
