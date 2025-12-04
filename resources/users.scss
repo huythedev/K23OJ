@@ -153,7 +153,7 @@ img.user-gravatar {
     }
 
     .user-content {
-        overflow: visible;
+        overflow: hidden;
     }
 }
 
@@ -227,6 +227,8 @@ img.user-gravatar {
     #submission-activity-display {
         border: 1px solid $color_primary25;
         border-radius: $table_header_rounding;
+        overflow-x: auto;
+        max-width: 100%;
 
         .info-bar {
             display: flex;
@@ -307,15 +309,12 @@ img.user-gravatar {
 }
 
 .user-info-container {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: $spacing-4;
     margin-bottom: $spacing-6;
-    justify-content: space-between;
 
     .user-info-card {
-        flex: 1;
-        min-width: 140px;
         background: $color_primary0;
         border: 1px solid $color_primary25;
         border-radius: $widget_border_radius;

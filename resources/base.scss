@@ -1,21 +1,5 @@
 @use "vars" as *;
 
-// Modern viewport settings
-@-ms-viewport {
-    min-width: 480px;
-    max-width: device-width;
-}
-
-@-o-viewport {
-    min-width: 480px;
-    max-width: device-width;
-}
-
-@viewport {
-    min-width: 480px;
-    max-width: device-width;
-}
-
 // Modern Link Styles
 a {
     color: $color_link75;
@@ -399,9 +383,10 @@ math {
 
 @media (max-width: 760px) {
     #content {
-        width: auto;
+        width: 100%;
         padding: 0 $spacing-3;
         margin-top: 52px;
+        box-sizing: border-box;
     }
     
     h1 {
