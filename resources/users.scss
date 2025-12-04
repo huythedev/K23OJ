@@ -358,3 +358,21 @@ img.user-gravatar {
         }
     }
 }
+@media (max-width: 768px) {
+    .user-profile-wrapper {
+        flex-direction: column !important;
+        width: 100% !important;
+    }
+
+    .user-about-stats {
+        grid-template-columns: 1fr !important;
+    }
+
+    .col-lg-3,
+    .col-lg-9,
+    .col-md-4,
+    .col-md-8 {
+        max-width: 100% !important;
+        flex: 0 0 100% !important;
+    }
+}
