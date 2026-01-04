@@ -44,7 +44,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='tagproblem',
             name='code',
-            field=models.CharField(db_index=True, help_text='A short, unique code for the problem, used in the url after /tag/', max_length=32, unique=True, validators=[django.core.validators.RegexValidator('^[a-zA-Z0-9_]+$', 'Problem code must be ^[a-zA-Z0-9_]+$')], verbose_name='problem code'),
+            field=models.CharField(db_index=True, help_text='A short, unique code for the problem, used in the url after /tag/', max_length=64, unique=True, validators=[django.core.validators.RegexValidator('^[a-zA-Z0-9_]+$', 'Problem code must be ^[a-zA-Z0-9_]+$')], verbose_name='problem code'),
         ),
         migrations.AlterField(
             model_name='tagproblem',

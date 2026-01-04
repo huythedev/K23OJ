@@ -137,7 +137,7 @@ class Problem(models.Model):
         (ProblemTestcaseResultAccess.ONLY_SUBMISSION_RESULT, _('Show submission result only')),
     )
 
-    code = models.CharField(max_length=32, verbose_name=_('problem code'), unique=True,
+    code = models.CharField(max_length=64, verbose_name=_('problem code'), unique=True,
                             validators=[RegexValidator('^[a-z0-9_]+$', _('Problem code must be ^[a-z0-9_]+$'))],
                             help_text=_('A short, unique code for the problem, used in the url after /problem/'))
     name = models.CharField(max_length=100, verbose_name=_('problem name'), db_index=True,

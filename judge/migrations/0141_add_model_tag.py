@@ -43,7 +43,7 @@ class Migration(migrations.Migration):
             name='TagProblem',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('code', models.CharField(help_text='A short, unique code for the problem, used in the url after /tag/', max_length=32, unique=True, validators=[django.core.validators.RegexValidator('^[a-zA-Z0-9_]+$', 'Problem code must be ^[a-zA-Z0-9_]+$')], verbose_name='problem code')),
+                ('code', models.CharField(help_text='A short, unique code for the problem, used in the url after /tag/', max_length=64, unique=True, validators=[django.core.validators.RegexValidator('^[a-zA-Z0-9_]+$', 'Problem code must be ^[a-zA-Z0-9_]+$')], verbose_name='problem code')),
                 ('name', models.CharField(help_text='The full name of the problem, as shown in the problem list.', max_length=100, verbose_name='problem name')),
                 ('link', models.URLField(help_text='Full URL to the problem.', verbose_name='Problem URL')),
                 ('judge', models.CharField(blank=True, help_text='Original OJ of the problem', max_length=30, null=True, verbose_name='Online Judge')),

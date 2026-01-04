@@ -107,7 +107,7 @@ class Migration(migrations.Migration):
                 ('user_count', models.IntegerField(default=0, verbose_name='the amount of live participants')),
                 ('summary', models.TextField(blank=True, help_text='Plain-text, shown in meta description tag, e.g. for social media.', verbose_name='contest summary')),
                 ('access_code', models.CharField(blank=True, default='', help_text='An optional code to prompt contestants before they are allowed to join the contest. Leave it blank to disable.', max_length=255, verbose_name='access code')),
-                ('format_name', models.CharField(choices=[('default', 'Default')], default='default', help_text='The contest format module to use.', max_length=32, verbose_name='contest format')),
+                ('format_name', models.CharField(choices=[('default', 'Default')], default='default', help_text='The contest format module to use.', max_length=64, verbose_name='contest format')),
                 ('format_config', jsonfield.fields.JSONField(blank=True, help_text='A JSON object to serve as the configuration for the chosen contest format module. Leave empty to use None. Exact format depends on the contest format selected.', null=True, verbose_name='contest format configuration')),
             ],
             options={

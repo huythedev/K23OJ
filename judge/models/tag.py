@@ -25,7 +25,7 @@ class Tag(models.Model):
 
 
 class TagProblem(models.Model):
-    code = models.CharField(max_length=32, verbose_name=_('problem code'), unique=True, db_index=True,
+    code = models.CharField(max_length=64, verbose_name=_('problem code'), unique=True, db_index=True,
                             validators=[RegexValidator('^[a-zA-Z0-9_]+$', _('Problem code must be ^[a-zA-Z0-9_]+$'))],
                             help_text=_('A short, unique code for the problem, '
                                         'used in the url after /tag/'))

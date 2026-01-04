@@ -71,7 +71,7 @@ class Contest(models.Model):
         (SCOREBOARD_AFTER_CONTEST, _('Hidden for duration of contest')),
         (SCOREBOARD_AFTER_PARTICIPATION, _('Hidden for duration of participation')),
     )
-    key = models.CharField(max_length=32, verbose_name=_('contest id'), unique=True,
+    key = models.CharField(max_length=64, verbose_name=_('contest id'), unique=True,
                            validators=[RegexValidator('^[a-z0-9_]+$', _('Contest id must be ^[a-z0-9_]+$'))])
     name = models.CharField(max_length=100, verbose_name=_('contest name'), db_index=True)
     authors = models.ManyToManyField(Profile, help_text=_('These users will be able to edit the contest.'),
@@ -166,7 +166,7 @@ class Contest(models.Model):
                                           help_text=_('Bans the selected users from joining this contest.'))
     banned_judges = models.ManyToManyField('judge.Judge', verbose_name=_('Banned judges'), blank=True,
                                            help_text=_('Bans the selected judges from judging this contest.'))
-    format_name = models.CharField(verbose_name=_('contest format'), default='default', max_length=32,
+    format_name = models.CharField(verbose_name=_('contest format'), default='default', max_length=64,
                                    choices=contest_format.choices(), help_text=_('The contest format module to use.'))
     format_config = JSONField(verbose_name=_('contest format configuration'), null=True, blank=True,
                               help_text=_('A JSON object to serve as the configuration for the chosen contest format '

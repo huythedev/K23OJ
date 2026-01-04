@@ -267,7 +267,7 @@ class ProblemEditTypeGroupForm(ModelForm):
 
 
 class ProblemImportPolygonForm(Form):
-    code = CharField(max_length=32, validators=[RegexValidator('^[a-z0-9_]+$', _('Problem code must be ^[a-z0-9_]+$'))])
+    code = CharField(max_length=64, validators=[RegexValidator('^[a-z0-9_]+$', _('Problem code must be ^[a-z0-9_]+$'))])
     package = forms.FileField(
         label=_('Package'),
         widget=forms.FileInput(attrs={'accept': 'application/zip'}),
@@ -647,7 +647,7 @@ class TwoFactorLoginForm(TOTPForm):
 
 
 class ProblemCloneForm(Form):
-    code = CharField(max_length=32, validators=[RegexValidator('^[a-z0-9_]+$', _('Problem code must be ^[a-z0-9_]+$'))])
+    code = CharField(max_length=64, validators=[RegexValidator('^[a-z0-9_]+$', _('Problem code must be ^[a-z0-9_]+$'))])
 
     def clean_code(self):
         code = self.cleaned_data['code']
@@ -666,7 +666,7 @@ class ContestAnnouncementForm(forms.ModelForm):
 
 
 class ContestCloneForm(Form):
-    key = CharField(max_length=32, validators=[RegexValidator('^[a-z0-9_]+$', _('Contest id must be ^[a-z0-9_]+$'))])
+    key = CharField(max_length=64, validators=[RegexValidator('^[a-z0-9_]+$', _('Contest id must be ^[a-z0-9_]+$'))])
 
     def clean_key(self):
         key = self.cleaned_data['key']

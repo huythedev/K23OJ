@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='contest',
             name='format_name',
-            field=models.CharField(choices=[('atcoder', 'AtCoder'), ('default', 'Default'), ('ecoo', 'ECOO'), ('icpc', 'ICPC'), ('ioi', 'IOI (pre-2016)'), ('ioi16', 'IOI')], default='default', help_text='The contest format module to use.', max_length=32, verbose_name='contest format'),
+            field=models.CharField(choices=[('atcoder', 'AtCoder'), ('default', 'Default'), ('ecoo', 'ECOO'), ('icpc', 'ICPC'), ('ioi', 'IOI (pre-2016)'), ('ioi16', 'IOI')], default='default', help_text='The contest format module to use.', max_length=64, verbose_name='contest format'),
         ),
         migrations.AlterField(
             model_name='judge',
