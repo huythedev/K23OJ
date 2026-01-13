@@ -23,8 +23,40 @@
     <script src="{{ static('libs/featherlight/featherlight.min.js') }}"></script>
     <script type="text/javascript">
         $(function() {
+            // Function to handle problem selection change - auto-fill order
+            function setupProblemAutofill($row) {
+                var $problemSelect = $row.find('select[name$="-problem"]');
+                var $orderInput = $row.find('input[name$="-order"]');
+
+                $problemSelect.on('change', function() {
+                    // Auto-fill order if empty
+                    if (!$orderInput.val()) {
+                        // Count only rows that have the problem select (actual form rows)
+                        var formRows = $row.closest('tbody').find('tr').filter(function() {
+                            return $(this).find('select[name$="-problem"]').length > 0;
+                        });
+                        var rowIndex = formRows.index($row) + 1;
+                        $orderInput.val(rowIndex);
+                    }
+                });
+            }
+
+            // Setup autofill for existing rows
+            $('#form_set tr').each(function() {
+                setupProblemAutofill($(this));
+            });
+
             $('#form_set tr').formset({
-                prefix: '{{ contest_problem_formset.prefix }}'
+                prefix: '{{ contest_problem_formset.prefix }}',
+                added: function($row) {
+                    setupProblemAutofill($row);
+                    // Auto-fill order for new row - count only actual form rows
+                    var $orderInput = $row.find('input[name$="-order"]');
+                    var formRows = $('#form_set tr').filter(function() {
+                        return $(this).find('select[name$="-problem"]').length > 0;
+                    });
+                    $orderInput.val(formRows.length);
+                }
             });
 
             var noResults = function () {

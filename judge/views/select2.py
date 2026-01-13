@@ -196,3 +196,19 @@ class AssigneeSelect2View(UserSearchSelect2View):
     def get_queryset(self):
         return Profile.objects.filter(assigned_tickets__isnull=False,
                                       user__username__icontains=self.term).distinct()
+
+
+class ProblemPointsView(BaseListView):
+    def get(self, request, *args, **kwargs):
+        problem_id = kwargs.get('pk')
+        try:
+            problem = Problem.objects.get(pk=problem_id)
+            if not problem.is_accessible_by(request.user):
+                raise Http404()
+            return JsonResponse({
+                'points': problem.points,
+                'code': problem.code,
+                'name': problem.name,
+            })
+        except Problem.DoesNotExist:
+            raise Http404()
