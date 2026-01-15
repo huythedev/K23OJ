@@ -253,7 +253,7 @@ nav {
     display: none;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 1100px) {
     #navigation {
         height: 44px;
         background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
@@ -349,7 +349,7 @@ nav {
     }
 }
 
-@media not all and (max-width: 760px) {
+@media not all and (max-width: 1100px) {
     #nav-list {
         li {
             &.home-menu-item {
