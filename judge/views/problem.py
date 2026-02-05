@@ -2,9 +2,12 @@ import json
 import logging
 import os
 import re
+import zipfile
 from datetime import timedelta
 from operator import itemgetter
 from random import randrange
+
+import yaml
 
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -21,7 +24,7 @@ from django.utils.functional import cached_property
 from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _, gettext_lazy
-from django.views.generic import CreateView, FormView, ListView, UpdateView, View
+from django.views.generic import CreateView, DetailView, FormView, ListView, UpdateView, View
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.detail import SingleObjectMixin
 from reversion import revisions
@@ -29,14 +32,15 @@ from reversion import revisions
 from judge.comments import CommentedDetailView
 from judge.forms import LanguageLimitFormSet, ProblemCloneForm, ProblemEditForm, ProblemEditTypeGroupForm, \
     ProblemImportPolygonForm, ProblemImportPolygonStatementFormSet, ProblemSubmitForm, ProposeProblemSolutionFormSet
-from judge.models import ContestSubmission, Judge, Language, Problem, ProblemGroup, \
-    ProblemTranslation, ProblemType, RuntimeVersion, Solution, Submission, SubmissionSource
+from judge.models import ContestSubmission, Judge, Language, Problem, ProblemGroup, ProblemTestCase, \
+    ProblemTranslation, ProblemType, RuntimeVersion, Solution, Submission, SubmissionSource, problem_data_storage
 from judge.tasks import on_new_problem
 from judge.template_context import misc_config
 from judge.utils.codeforces_polygon import ImportPolygonError, PolygonImporter
 from judge.utils.diggpaginator import DiggPaginator
 from judge.utils.opengraph import generate_opengraph
 from judge.utils.pdfoid import PDF_RENDERING_ENABLED, render_pdf
+from judge.utils.problem_data import get_visible_content
 from judge.utils.problems import hot_problems, user_attempted_ids, \
     user_completed_ids
 from judge.utils.strings import safe_float_or_none, safe_int_or_none
@@ -46,6 +50,23 @@ from judge.views.widgets import pdf_statement_uploader, submission_uploader
 
 recjk = re.compile(r'[\u2E80-\u2E99\u2E9B-\u2EF3\u2F00-\u2FD5\u3005\u3007\u3021-\u3029\u3038-\u303A\u303B\u3400-\u4DB5'
                    r'\u4E00-\u9FC3\uF900-\uFA2D\uFA30-\uFA6A\uFA70-\uFAD9\U00020000-\U0002A6D6\U0002F800-\U0002FA1D]')
+
+
+def _get_problem_archive_path(problem):
+    init_path = '%s/init.yml' % problem.code
+    if not problem_data_storage.exists(init_path):
+        return None
+    try:
+        init_content = yaml.safe_load(problem_data_storage.open(init_path).read())
+    except Exception:
+        return None
+    archive_name = init_content.get('archive') if isinstance(init_content, dict) else None
+    if not archive_name:
+        return None
+    archive_path = '%s/%s' % (problem.code, archive_name)
+    if not problem_data_storage.exists(archive_path):
+        return None
+    return archive_path
 
 
 def get_contest_problem(problem, profile):
@@ -211,6 +232,8 @@ class ProblemDetail(ProblemMixin, SolvedProblemMixin, CommentedDetailView):
         context['has_pdf_render'] = PDF_RENDERING_ENABLED
         context['completed_problem_ids'] = self.get_completed_problems()
         context['attempted_problems'] = self.get_attempted_problems()
+        context['has_sample_testcases'] = self.object.is_testcase_accessible_by(user) and \
+            ProblemTestCase.objects.filter(dataset=self.object, is_sample=True).exists()
 
         can_edit = self.object.is_editable_by(user)
         context['can_edit_problem'] = can_edit
@@ -244,6 +267,93 @@ class ProblemDetail(ProblemMixin, SolvedProblemMixin, CommentedDetailView):
         context['meta_description'] = self.object.summary or metadata[0]
         context['og_image'] = self.object.og_image or metadata[1]
         return context
+
+
+class ProblemSampleTestcases(ProblemMixin, TitleMixin, DetailView):
+    context_object_name = 'problem'
+    template_name = 'problem/sample-testcases.html'
+
+    def get_title(self):
+        return _('Sample testcases for {0}').format(self.object.name)
+
+    def get_content_title(self):
+        return mark_safe(escape(_('Sample testcases for {0}')).format(
+            format_html('<a href="{1}">{0}</a>', self.object.name, reverse('problem_detail', args=[self.object.code])),
+        ))
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if not self.object.is_testcase_accessible_by(request.user):
+            raise Http404()
+        return super(ProblemSampleTestcases, self).get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super(ProblemSampleTestcases, self).get_context_data(**kwargs)
+        cases = ProblemTestCase.objects.filter(dataset=self.object, is_sample=True).order_by('order')
+        sample_cases = []
+        archive_error = None
+        archive_path = _get_problem_archive_path(self.object)
+
+        if archive_path and cases.exists():
+            try:
+                with problem_data_storage.open(archive_path, 'rb') as archive_file:
+                    with zipfile.ZipFile(archive_file) as archive:
+                        for case in cases:
+                            if not case.input_file or not case.output_file:
+                                continue
+                            try:
+                                input_preview = get_visible_content(archive, case.input_file)
+                            except KeyError:
+                                input_preview = ''
+                            try:
+                                output_preview = get_visible_content(archive, case.output_file)
+                            except KeyError:
+                                output_preview = ''
+                            sample_cases.append({
+                                'case': case,
+                                'input_preview': input_preview,
+                                'output_preview': output_preview,
+                            })
+            except zipfile.BadZipFile:
+                archive_error = _('Sample data archive is invalid.')
+        elif cases.exists():
+            archive_error = _('Sample data archive is not available.')
+
+        context['sample_cases'] = sample_cases
+        context['sample_archive_error'] = archive_error
+        return context
+
+
+def problem_sample_testcase_download(request, problem, case_id, kind):
+    problem = get_object_or_404(Problem, code=problem)
+    if not problem.is_testcase_accessible_by(request.user):
+        raise Http404()
+
+    case = get_object_or_404(ProblemTestCase, dataset=problem, id=case_id, is_sample=True)
+    if kind not in ('in', 'out'):
+        raise Http404()
+
+    filename = case.input_file if kind == 'in' else case.output_file
+    if not filename:
+        raise Http404()
+
+    archive_path = _get_problem_archive_path(problem)
+    if not archive_path:
+        raise Http404()
+
+    try:
+        with problem_data_storage.open(archive_path, 'rb') as archive_file:
+            with zipfile.ZipFile(archive_file) as archive:
+                try:
+                    data = archive.read(filename)
+                except KeyError:
+                    raise Http404()
+    except zipfile.BadZipFile:
+        raise Http404()
+
+    response = HttpResponse(data, content_type='application/octet-stream')
+    response['Content-Disposition'] = 'attachment; filename=%s' % os.path.basename(filename)
+    return response
 
 
 class LatexError(Exception):

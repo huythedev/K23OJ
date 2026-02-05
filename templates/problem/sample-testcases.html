@@ -1,0 +1,186 @@
+{% extends "common-content.html" %}
+
+{% block content_media %}
+    <style>
+        .sample-case {
+            margin-bottom: 2.5em;
+            padding: 1.5em;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .sample-case h3 {
+            margin: 0 0 1.25em;
+            font-size: 1.25em;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .sample-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5em;
+        }
+
+        .sample-card {
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 1em;
+            background: #ffffff;
+            transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+
+        .sample-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .sample-card h4 {
+            margin: 0 0 0.75em;
+            font-size: 1em;
+            font-weight: 600;
+            color: #0366d6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sample-file {
+            margin-bottom: 0.75em;
+        }
+
+        .sample-file a {
+            color: #0366d6;
+            text-decoration: none;
+            font-size: 0.9em;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3em;
+        }
+
+        .sample-file a:hover {
+            text-decoration: underline;
+        }
+
+        .sample-file a::before {
+            content: "📄";
+        }
+
+        .sample-content pre {
+            margin: 0;
+            max-height: 24em;
+            overflow: auto;
+            padding: 1em;
+            background: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+            color: #24292e;
+        }
+
+        .sample-content pre::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .sample-content pre::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 4px;
+        }
+
+        .sample-content pre::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0;
+        }
+
+        .alert {
+            padding: 1em 1.25em;
+            border-radius: 6px;
+            margin-bottom: 1.5em;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        h2 {
+            margin-bottom: 1.5em;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        @media (max-width: 900px) {
+            .sample-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .sample-case {
+                padding: 1em;
+                margin-bottom: 2em;
+            }
+
+            .sample-card {
+                padding: 0.875em;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .sample-content pre {
+                font-size: 0.85em;
+                padding: 0.75em;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block info_float %}
+    <a href="{{ url('problem_detail', problem.code) }}" class="unselectable button full">
+        {{ _('Back to problem') }}
+    </a>
+    <hr style="padding-bottom: 0.3em">
+    <div><a href="{{ url('problem_submit', problem.code) }}">{{ _('Submit solution') }}</a></div>
+{% endblock %}
+
+{% block description %}
+    <h2>{{ _('Sample testcases') }}</h2>
+    {% if sample_archive_error %}
+        <div class="alert alert-danger">{{ sample_archive_error }}</div>
+    {% endif %}
+    {% if not sample_cases %}
+        <div class="alert alert-info">{{ _('No sample testcases are available for this problem.') }}</div>
+    {% else %}
+        {% for sample in sample_cases %}
+            <div class="sample-case">
+                <h3>{{ _('Sample case') }} #{{ loop.index }}</h3>
+                <div class="sample-grid">
+                    <div class="sample-card">
+                        <h4>{{ _('Input') }}</h4>
+                        <div class="sample-file">
+                            <a href="{{ url('problem_sample_testcase_download', problem.code, sample.case.id, 'in') }}">
+                                {{ sample.case.input_file }}
+                            </a>
+                        </div>
+                        <div class="sample-content"><pre>{{ sample.input_preview }}</pre></div>
+                    </div>
+                    <div class="sample-card">
+                        <h4>{{ _('Output') }}</h4>
+                        <div class="sample-file">
+                            <a href="{{ url('problem_sample_testcase_download', problem.code, sample.case.id, 'out') }}">
+                                {{ sample.case.output_file }}
+                            </a>
+                        </div>
+                        <div class="sample-content"><pre>{{ sample.output_preview }}</pre></div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endblock %}
