@@ -164,7 +164,7 @@
                         <h4>{{ _('Input') }}</h4>
                         <div class="sample-file">
                             <a href="{{ url('problem_sample_testcase_download', problem.code, sample.case.id, 'in') }}">
-                                {{ sample.case.input_file }}
+                                {{ sample.case.input_file.split('/', 1)[-1] }}
                             </a>
                         </div>
                         <div class="sample-content"><pre>{{ sample.input_preview }}</pre></div>
@@ -173,7 +173,7 @@
                         <h4>{{ _('Output') }}</h4>
                         <div class="sample-file">
                             <a href="{{ url('problem_sample_testcase_download', problem.code, sample.case.id, 'out') }}">
-                                {{ sample.case.output_file }}
+                                {{ sample.case.output_file.split('/', 1)[-1] }}
                             </a>
                         </div>
                         <div class="sample-content"><pre>{{ sample.output_preview }}</pre></div>
