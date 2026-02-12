@@ -47,7 +47,10 @@
                             if ($select.attr('id').endsWith('input_file'))
                                 autofill_if_exists($tr.find('select[id$=output_file]'), val.replace(/in(?!.*?in)/, 'out'));
                             else
-                                autofill_if_exists($tr.find('select[id$=input_file]'), val.replace(/out(?!.*?out)/, 'in'));
+                                autofill_if_exists(
+                                    $tr.find('select[id$=input_file]'),
+                                    val.replace(/(out|ok|ans|sol)(?!.*?(out|ok|ans|sol))/, 'in')
+                                );
                         }
                     });
                 });
@@ -448,10 +451,10 @@
                 ];
 
                 var out_re = [
-                    new RegExp(/^(.+\.out|.+\.ok|.+\.ans|out|ok|ans)$/),
+                    new RegExp(/^(.+\.out|.+\.ok|.+\.ans|.+\.sol|out|ok|ans|sol)$/),
                     new RegExp(/^output.(.+\d+)$/),
                     new RegExp(/^(.+\d+\.a)$/),
-                    new RegExp(/^(?=.*?\.out|out).*?(?:(?:^|\W)(?<batch>\d+)[^\d\s]+)?(?<case>\d+)[^\d\s]*$/),
+                    new RegExp(/^(?=.*?(\.out|\.sol)|out|sol).*?(?:(?:^|\W)(?<batch>\d+)[^\d\s]+)?(?<case>\d+)[^\d\s]*$/),
                 ];
 
                 var test_type = -1;
