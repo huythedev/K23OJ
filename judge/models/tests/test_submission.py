@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from judge.models import ContestSubmission, Language, Submission, SubmissionSource
+from judge.models.problem import SubmissionSourceAccess
 from judge.models.tests.util import CommonDataMixin, create_contest, create_contest_participation, \
     create_contest_problem, create_problem, create_user
 
@@ -189,3 +190,28 @@ class SubmissionTestCase(CommonDataMixin, TestCase):
             },
         }
         self._test_object_methods_with_users(self.ie_submission, data)
+
+    def test_contest_submission_hidden_after_contest_becomes_private(self):
+        contest = create_contest(key='submission_access_contest', is_visible=True)
+        problem = create_problem(
+            code='submission_access_problem',
+            is_public=True,
+            submission_source_visibility_mode=SubmissionSourceAccess.ALWAYS,
+        )
+        submission = Submission.objects.create(
+            user=self.users['superuser'].profile,
+            problem=problem,
+            language=Language.get_python3(),
+            result='AC',
+            status='D',
+            case_points=1,
+            case_total=1,
+            contest_object=contest,
+        )
+
+        self.assertTrue(submission.can_see_detail(self.users['normal']))
+
+        contest.is_private = True
+        contest.save(update_fields=['is_private'])
+
+        self.assertFalse(submission.can_see_detail(self.users['normal']))
