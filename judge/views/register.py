@@ -1,4 +1,5 @@
 # coding=utf-8
+import logging
 import re
 
 from django import forms
@@ -21,6 +22,7 @@ from judge.utils.subscription import Subscription, newsletter_id
 from judge.widgets import Select2MultipleWidget, Select2Widget
 
 bad_mail_regex = list(map(re.compile, settings.BAD_MAIL_PROVIDER_REGEX))
+logger = logging.getLogger(__name__)
 
 
 class CustomRegistrationForm(RegistrationForm):
@@ -80,7 +82,11 @@ class CustomRegistrationForm(RegistrationForm):
             expected_action=settings.RECAPTCHA_V3_REGISTER_ACTION,
         )
         if not ok:
-            raise forms.ValidationError(_('Anti-spam verification failed. Please try again.'))
+            logger.warning('reCAPTCHA v3 verification failed during registration: %s', error_code)
+            message = _('Anti-spam verification failed. Please try again.')
+            if error_code:
+                message = '%s (%s)' % (message, error_code)
+            raise forms.ValidationError(message)
         return token
 
 
@@ -106,6 +112,7 @@ class RegistrationView(OldRegistrationView):
         kwargs['recaptcha_v3_enabled'] = recaptcha_v3_enabled()
         kwargs['recaptcha_v3_site_key'] = settings.RECAPTCHA_V3_SITE_KEY
         kwargs['recaptcha_v3_register_action'] = settings.RECAPTCHA_V3_REGISTER_ACTION
+        kwargs['recaptcha_v3_api_domain'] = settings.RECAPTCHA_V3_API_DOMAIN
         return super(RegistrationView, self).get_context_data(**kwargs)
 
     @transaction.atomic

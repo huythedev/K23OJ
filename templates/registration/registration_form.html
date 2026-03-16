@@ -150,18 +150,12 @@
             {% if recaptcha_v3_enabled %}
             var recaptchaAction = '{{ recaptcha_v3_register_action }}';
             var recaptchaPending = false;
-            $('#edit-form').on('submit', function (e) {
-                var tokenInput = $('#id_recaptcha_token');
-                if (recaptchaPending || (tokenInput.length && tokenInput.val())) {
-                    return true;
-                }
+            var tokenInput = $('#id_recaptcha_token');
+            if (tokenInput.length) {
+                tokenInput.val('');
+            }
 
-                e.preventDefault();
-                if (typeof grecaptcha === 'undefined') {
-                    return false;
-                }
-
-                recaptchaPending = true;
+            function submitWithRecaptchaToken(retryCount) {
                 grecaptcha.ready(function () {
                     grecaptcha.execute('{{ recaptcha_v3_site_key }}', {action: recaptchaAction})
                         .then(function (token) {
@@ -170,16 +164,39 @@
                             $('#edit-form')[0].submit();
                         })
                         .catch(function () {
+                            if (retryCount > 0) {
+                                submitWithRecaptchaToken(retryCount - 1);
+                                return;
+                            }
                             recaptchaPending = false;
                         });
                 });
+            }
+
+            $('#edit-form').on('submit', function (e) {
+                if (recaptchaPending) {
+                    e.preventDefault();
+                    return false;
+                }
+
+                e.preventDefault();
+                if (typeof grecaptcha === 'undefined') {
+                    return false;
+                }
+
+                if (tokenInput.length) {
+                    tokenInput.val('');
+                }
+
+                recaptchaPending = true;
+                submitWithRecaptchaToken(2);
                 return false;
             });
             {% endif %}
         });
     </script>
     {% if recaptcha_v3_enabled %}
-        <script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_v3_site_key }}" async defer></script>
+        <script src="https://{{ recaptcha_v3_api_domain }}/recaptcha/api.js?render={{ recaptcha_v3_site_key }}" async defer></script>
     {% endif %}
 {% endblock %}
 

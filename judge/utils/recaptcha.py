@@ -2,9 +2,6 @@ from django.conf import settings
 
 import requests
 
-VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify'
-
-
 def recaptcha_v3_enabled():
     return bool(settings.RECAPTCHA_V3_SITE_KEY and settings.RECAPTCHA_V3_SECRET_KEY)
 
@@ -23,8 +20,10 @@ def verify_recaptcha_v3(token, remoteip=None, expected_action=None):
     if remoteip:
         payload['remoteip'] = remoteip
 
+    verify_url = 'https://%s/recaptcha/api/siteverify' % settings.RECAPTCHA_V3_API_DOMAIN
+
     try:
-        response = requests.post(VERIFY_URL, data=payload, timeout=5)
+        response = requests.post(verify_url, data=payload, timeout=5)
         response.raise_for_status()
         result = response.json()
     except (requests.RequestException, ValueError):
@@ -33,10 +32,14 @@ def verify_recaptcha_v3(token, remoteip=None, expected_action=None):
     if not result.get('success', False):
         return False, ','.join(result.get('error-codes', [])) or 'verification-failed'
 
-    if expected_action and result.get('action') != expected_action:
-        return False, 'action-mismatch'
+    actual_action = result.get('action')
+    if expected_action and actual_action != expected_action:
+        return False, 'action-mismatch:%s' % (actual_action or 'missing')
 
-    if result.get('score', 0) < settings.RECAPTCHA_V3_MIN_SCORE:
-        return False, 'low-score'
+    score = result.get('score')
+    if score is None:
+        return False, 'missing-score'
+    if score < settings.RECAPTCHA_V3_MIN_SCORE:
+        return False, 'low-score:%s' % score
 
     return True, None
