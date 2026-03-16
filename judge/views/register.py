@@ -74,7 +74,11 @@ class CustomRegistrationForm(RegistrationForm):
             return token
 
         remoteip = None if self.request is None else self.request.META.get(settings.IP_BASED_AUTHENTICATION_HEADER)
-        ok, _ = verify_recaptcha_v3(token, remoteip=remoteip, expected_action=settings.RECAPTCHA_V3_REGISTER_ACTION)
+        ok, error_code = verify_recaptcha_v3(
+            token,
+            remoteip=remoteip,
+            expected_action=settings.RECAPTCHA_V3_REGISTER_ACTION,
+        )
         if not ok:
             raise forms.ValidationError(_('Anti-spam verification failed. Please try again.'))
         return token
