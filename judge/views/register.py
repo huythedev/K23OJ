@@ -16,7 +16,7 @@ from sortedm2m.forms import SortedMultipleChoiceField
 
 from judge.forms import SocialAuthMixin
 from judge.models import Language, Organization, Profile, TIMEZONE
-from judge.utils.recaptcha import ReCaptchaField, ReCaptchaWidget
+from judge.utils.recaptcha import recaptcha_v3_enabled, verify_recaptcha_v3
 from judge.utils.subscription import Subscription, newsletter_id
 from judge.widgets import Select2MultipleWidget, Select2Widget
 
@@ -35,12 +35,17 @@ class CustomRegistrationForm(RegistrationForm):
     organizations = SortedMultipleChoiceField(queryset=Organization.objects.filter(is_open=True),
                                               label=_('Organizations'), required=False,
                                               widget=Select2MultipleWidget(attrs={'style': 'width:100%'}))
+    recaptcha_token = forms.CharField(widget=forms.HiddenInput(), required=False)
 
     if newsletter_id is not None:
         newsletter = forms.BooleanField(label=_('Subscribe to newsletter?'), initial=True, required=False)
 
-    if ReCaptchaField is not None:
-        captcha = ReCaptchaField(widget=ReCaptchaWidget())
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop('request', None)
+        super().__init__(*args, **kwargs)
+
+        if not recaptcha_v3_enabled():
+            self.fields.pop('recaptcha_token', None)
 
     def clean_email(self):
         if User.objects.filter(email=self.cleaned_data['email']).exists():
@@ -63,12 +68,28 @@ class CustomRegistrationForm(RegistrationForm):
                                                  max_orgs).format(count=max_orgs))
         return self.cleaned_data['organizations']
 
+    def clean_recaptcha_token(self):
+        token = self.cleaned_data.get('recaptcha_token', '')
+        if not recaptcha_v3_enabled():
+            return token
+
+        remoteip = None if self.request is None else self.request.META.get(settings.IP_BASED_AUTHENTICATION_HEADER)
+        ok, _ = verify_recaptcha_v3(token, remoteip=remoteip, expected_action=settings.RECAPTCHA_V3_REGISTER_ACTION)
+        if not ok:
+            raise forms.ValidationError(_('Anti-spam verification failed. Please try again.'))
+        return token
+
 
 class RegistrationView(OldRegistrationView):
     title = _('Register')
     form_class = CustomRegistrationForm
     social_auth = SocialAuthMixin()
     template_name = 'registration/registration_form.html'
+
+    def get_form_kwargs(self):
+        kwargs = super(RegistrationView, self).get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
 
     def get_context_data(self, **kwargs):
         if 'title' not in kwargs:
@@ -78,6 +99,9 @@ class RegistrationView(OldRegistrationView):
         kwargs['tos_url'] = settings.TERMS_OF_SERVICE_URL
         kwargs['oauth_only'] = settings.OAUTH_ONLY
         kwargs['oauth'] = self.social_auth
+        kwargs['recaptcha_v3_enabled'] = recaptcha_v3_enabled()
+        kwargs['recaptcha_v3_site_key'] = settings.RECAPTCHA_V3_SITE_KEY
+        kwargs['recaptcha_v3_register_action'] = settings.RECAPTCHA_V3_REGISTER_ACTION
         return super(RegistrationView, self).get_context_data(**kwargs)
 
     @transaction.atomic

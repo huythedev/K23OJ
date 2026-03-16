@@ -293,6 +293,12 @@ TIMEZONE_MAP = 'https://static.dmoj.ca/assets/earth.jpg'
 TERMS_OF_SERVICE_URL = None
 DEFAULT_USER_LANGUAGE = 'CPP17'
 
+# reCAPTCHA v3 for anti-spam protection on registration.
+RECAPTCHA_V3_SITE_KEY = None
+RECAPTCHA_V3_SECRET_KEY = None
+RECAPTCHA_V3_MIN_SCORE = 0.5
+RECAPTCHA_V3_REGISTER_ACTION = 'register'
+
 INLINE_JQUERY = True
 INLINE_FONTAWESOME = True
 JQUERY_JS = '/static/vnoj/jquery/3.4.1/jquery.min.js'

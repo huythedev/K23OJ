@@ -146,10 +146,40 @@
                     $('#id_timezone').val(tz).change();
                 }
             } catch (e) {}
+
+            {% if recaptcha_v3_enabled %}
+            var recaptchaAction = '{{ recaptcha_v3_register_action }}';
+            var recaptchaPending = false;
+            $('#edit-form').on('submit', function (e) {
+                var tokenInput = $('#id_recaptcha_token');
+                if (recaptchaPending || (tokenInput.length && tokenInput.val())) {
+                    return true;
+                }
+
+                e.preventDefault();
+                if (typeof grecaptcha === 'undefined') {
+                    return false;
+                }
+
+                recaptchaPending = true;
+                grecaptcha.ready(function () {
+                    grecaptcha.execute('{{ recaptcha_v3_site_key }}', {action: recaptchaAction})
+                        .then(function (token) {
+                            tokenInput.val(token);
+                            recaptchaPending = false;
+                            $('#edit-form')[0].submit();
+                        })
+                        .catch(function () {
+                            recaptchaPending = false;
+                        });
+                });
+                return false;
+            });
+            {% endif %}
         });
     </script>
-    {% if form.captcha %}
-        {{ recaptcha_init(LANGUAGE_CODE) }}
+    {% if recaptcha_v3_enabled %}
+        <script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_v3_site_key }}" async defer></script>
     {% endif %}
 {% endblock %}
 
@@ -226,10 +256,10 @@
                     </div>
                 {% endif %}
 
-                {% if form.captcha %}
-                    <div style="margin-top: 0.5em">{{ form.captcha }}</div>
-                    {% if form.captcha.errors %}
-                        <div class="form-field-error">{{ form.captcha.errors }}</div>
+                {% if form.recaptcha_token %}
+                    {{ form.recaptcha_token }}
+                    {% if form.recaptcha_token.errors %}
+                        <div class="form-field-error">{{ form.recaptcha_token.errors }}</div>
                     {% endif %}
                 {% endif %}
 
