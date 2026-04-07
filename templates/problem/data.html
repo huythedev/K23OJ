@@ -264,6 +264,27 @@
                 id: "submit-button",
             }).appendTo($file_test.parent());
 
+            var $upload_progress_wrapper = $('<div>', {
+                id: 'upload-progress-wrapper',
+                style: 'display:none;'
+            }).appendTo($file_test.parent());
+            var $upload_progress_text = $('<div>', {
+                id: 'upload-progress-text',
+                text: {{ _('Uploading testcase zip...')|htmltojs }},
+                style: 'margin-bottom: 0.3em; font-size: 0.95em;'
+            }).appendTo($upload_progress_wrapper);
+            var $upload_progress_bar = $('<div>', {
+                id: 'upload-progress-bar'
+            }).appendTo($upload_progress_wrapper);
+            var $upload_progress_fill = $('<div>', {
+                id: 'upload-progress-fill'
+            }).appendTo($upload_progress_bar);
+            var $upload_progress_meta = $('<div>', {
+                id: 'upload-progress-meta',
+                text: '0% - 0.00 MB/s',
+                style: 'margin-top: 0.3em; font-size: 0.9em; color: #555;'
+            }).appendTo($upload_progress_wrapper);
+
             function swap_row($a, $b) {
                 var $a_order = $a.find('input[id$=order]'), $b_order = $b.find('input[id$=order]');
                 var order = $a_order.val();
@@ -363,6 +384,78 @@
                         $(this).attr('checked', true);
                     }
                 });
+            });
+
+            $('form').submit(function (e) {
+                var form = this;
+                if (form.dataset.uploading === '1')
+                    return false;
+
+                // Only use XHR progress tracking when a testcase ZIP is actually selected.
+                if (!($file_test[0] && $file_test[0].files && $file_test[0].files.length))
+                    return true;
+
+                e.preventDefault();
+                form.dataset.uploading = '1';
+
+                var startTime = performance.now();
+                var lastLoaded = 0;
+                var lastTime = startTime;
+
+                $upload_progress_fill.css('width', '0%');
+                $upload_progress_meta.text('0% - 0.00 MB/s');
+                $upload_progress_text.text({{ _('Uploading testcase zip...')|htmltojs }});
+                $upload_progress_wrapper.show();
+
+                var $submit_buttons = $(form).find('input[type=submit], button[type=submit]');
+                $submit_buttons.prop('disabled', true);
+
+                var xhr = new XMLHttpRequest();
+                xhr.open(form.method || 'POST', form.action || window.location.href, true);
+
+                xhr.upload.onprogress = function (event) {
+                    if (!event.lengthComputable)
+                        return;
+
+                    var percent = Math.min(100, (event.loaded / event.total) * 100);
+                    var now = performance.now();
+                    var elapsed = Math.max((now - startTime) / 1000, 0.001);
+                    var interval = Math.max((now - lastTime) / 1000, 0.001);
+                    var avgSpeed = (event.loaded / elapsed) / (1024 * 1024);
+                    var instantSpeed = ((event.loaded - lastLoaded) / interval) / (1024 * 1024);
+                    var speed = Math.max(0, instantSpeed * 0.6 + avgSpeed * 0.4);
+
+                    $upload_progress_fill.css('width', percent.toFixed(1) + '%');
+                    $upload_progress_meta.text(percent.toFixed(1) + '% - ' + speed.toFixed(2) + ' MB/s');
+
+                    lastLoaded = event.loaded;
+                    lastTime = now;
+                };
+
+                xhr.onerror = function () {
+                    form.dataset.uploading = '0';
+                    $submit_buttons.prop('disabled', false);
+                    $upload_progress_text.text({{ _('Upload failed. Please try again.')|htmltojs }});
+                };
+
+                xhr.onload = function () {
+                    form.dataset.uploading = '0';
+                    $upload_progress_fill.css('width', '100%');
+                    $upload_progress_meta.text('100.0% - 0.00 MB/s');
+                    $upload_progress_text.text({{ _('Upload complete. Processing...')|htmltojs }});
+
+                    if (xhr.status >= 200 && xhr.status < 400) {
+                        document.open();
+                        document.write(xhr.responseText);
+                        document.close();
+                    } else {
+                        $submit_buttons.prop('disabled', false);
+                        $upload_progress_text.text({{ _('Upload failed. Please try again.')|htmltojs }});
+                    }
+                };
+
+                xhr.send(new FormData(form));
+                return false;
             });
 
             var $total = $('#id_cases-TOTAL_FORMS');
@@ -673,6 +766,28 @@
             padding-top: 1em;
             padding-bottom: 1em;
             background: #e99;
+        }
+
+        #upload-progress-wrapper {
+            width: 100%;
+            max-width: 32em;
+            margin: 0.75em auto 0;
+            text-align: center;
+        }
+
+        #upload-progress-bar {
+            width: 100%;
+            height: 10px;
+            border-radius: 8px;
+            background: #e6ebf2;
+            overflow: hidden;
+        }
+
+        #upload-progress-fill {
+            width: 0;
+            height: 100%;
+            background: linear-gradient(90deg, #2f7dd8 0%, #27a7d8 100%);
+            transition: width 0.15s linear;
         }
     </style>
 {% endblock %}

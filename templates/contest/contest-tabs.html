@@ -90,7 +90,8 @@
         {% endif %}
     {% elif (contest.can_join and not contest.require_registration) or contest.can_register %}
         <a href="{{ url('auth_login') }}?next={{ LOGIN_RETURN_PATH|urlencode }}"
-           class="contest-join-pseudotab unselectable button">{{ _('Log in to participate') }}</a>
+           class="contest-join-pseudotab unselectable button"
+           style="display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 15px; line-height: 1;">{{ _('Log in to participate') }}</a>
     {% endif %}
 {% endblock %}
 

@@ -160,13 +160,27 @@
     font-weight: 600;
 }
 
-form.contest-join-pseudotab {
-    display: inline;
-    padding: 6px 8px !important;
-    line-height: 1.7em;
+form.contest-join-pseudotab,
+a.contest-join-pseudotab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     margin-left: 0.5em;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
+
+    text-decoration: none;
+}
+
+a.contest-join-pseudotab {
+    height: 40px;
+    padding: 0 15px !important;
+    line-height: 1;
+}
+
+form.contest-join-pseudotab {
+    padding: 6px 8px !important;
+    line-height: 1.7em;
 
     input {
         display: inline;
