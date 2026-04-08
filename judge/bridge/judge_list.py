@@ -32,6 +32,15 @@ class JudgeList(object):
         self.problems = set()
         self.problem_ids = []
 
+    def _drop_broken_judge(self, judge):
+        """Remove a judge that failed dispatch and force a clean disconnect path."""
+        try:
+            judge.disconnect(force=True)
+        except Exception:
+            logger.exception('Failed to disconnect broken judge %s', getattr(judge, 'name', '<unknown>'))
+        self.judges.discard(judge)
+        self._update_min_tier()
+
     def _handle_free_judge(self, judge):
         with self.lock:
             if judge.tier > self.min_tier:
@@ -52,7 +61,7 @@ class JudgeList(object):
                             judge.submit(id, problem, language, source)
                         except Exception:
                             logger.exception('Failed to dispatch %d (%s, %s) to %s', id, problem, language, judge.name)
-                            self.judges.remove(judge)
+                            self._drop_broken_judge(judge)
                             return
                         logger.info('Dispatched queued submission %d: %s', id, judge.name)
                         self.queue.remove(node)
@@ -209,7 +218,7 @@ class JudgeList(object):
                     judge.submit(id, problem, language, source)
                 except Exception:
                     logger.exception('Failed to dispatch %d (%s, %s) to %s', id, problem, language, judge.name)
-                    self.judges.discard(judge)
+                    self._drop_broken_judge(judge)
                     return self.judge(id, problem, language, source, judge_id, priority, banned_judges)
             else:
                 self.node_map[id] = self.queue.insert(
