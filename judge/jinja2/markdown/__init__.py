@@ -14,6 +14,7 @@ from markupsafe import Markup
 from judge.highlight_code import highlight_code
 from judge.jinja2.markdown.lazy_load import lazy_load as lazy_load_processor
 from judge.utils.camo import client as camo_client
+from judge.utils.mathoid import MathoidMathParser, format_math
 from judge.utils.texoid import TEXOID_ENABLED, TexoidRenderer
 from .bleach_whitelist import all_styles, mathml_attrs, mathml_tags
 from .. import registry
@@ -24,6 +25,9 @@ NOFOLLOW_WHITELIST = settings.NOFOLLOW_EXCLUDED
 
 
 cleaner_cache = {}
+MATH_SEGMENT_RE = re.compile(r'(```[\s\S]*?```|`[^`\n]*`)')
+DISPLAY_MATH_RE = re.compile(r'(?<!\\)\$\$(.+?)(?<!\\)\$\$', re.S)
+INLINE_MATH_RE = re.compile(r'(?<![\\$])\$(?!\$)(.+?)(?<![\\$])\$(?!\$)', re.S)
 
 
 def get_cleaner(name, params):
@@ -131,6 +135,43 @@ def _mark_spoilers(tree):
         blockquote.set('class', ' '.join(sorted(classes)))
 
 
+def _render_math(segment, math_parser):
+    segment = DISPLAY_MATH_RE.sub(lambda m: math_parser.display_math(m.group(1).strip()), segment)
+    return INLINE_MATH_RE.sub(lambda m: math_parser.inline_math(m.group(1).strip()), segment)
+
+
+def _render_plain_tex_math(segment):
+    segment = DISPLAY_MATH_RE.sub(lambda m: '$$%s$$' % format_math(m.group(1).strip()), segment)
+    return INLINE_MATH_RE.sub(lambda m: '~%s~' % format_math(m.group(1).strip()), segment)
+
+
+def _apply_math(text, math_engine):
+    if not text or not math_engine:
+        return text
+
+    parser_engine = math_engine
+    if not settings.MATHOID_URL and math_engine in ('mml', 'svg', 'jax'):
+        # Without mathoid, keep TeX delimiters for client-side MathJax rendering.
+        parser_engine = 'tex'
+
+    if parser_engine == 'tex':
+        renderer = _render_plain_tex_math
+    elif parser_engine in MathoidMathParser.types:
+        math_parser = MathoidMathParser(parser_engine)
+        renderer = lambda segment: _render_math(segment, math_parser)
+    else:
+        return text
+
+    parts = MATH_SEGMENT_RE.split(text)
+    for i, part in enumerate(parts):
+        if not part:
+            continue
+        if MATH_SEGMENT_RE.fullmatch(part):
+            continue
+        parts[i] = renderer(part)
+    return ''.join(parts)
+
+
 @registry.filter
 def markdown(text, style, math_engine=None, lazy_load=False, strip_paragraphs=False):
     styles = settings.MARKDOWN_STYLES.get(style, settings.MARKDOWN_DEFAULT_STYLE)
@@ -163,6 +204,7 @@ def markdown(text, style, math_engine=None, lazy_load=False, strip_paragraphs=Fa
         },
     ).enable('table').enable('strikethrough')
 
+    text = _apply_math(text, math_engine)
     result = markdown_parser.render(text)
 
     result = add_table_class(result)

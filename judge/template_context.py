@@ -111,6 +111,10 @@ def math_setting(request):
         engine = request.profile.math_engine
     else:
         engine = settings.MATHOID_DEFAULT_TYPE
+
+    if not settings.MATHOID_URL and engine in ('mml', 'svg'):
+        engine = 'jax'
+
     if engine == 'auto':
         engine = 'mml' if bool(settings.MATHOID_URL) and caniuse.mathml == SUPPORT else 'jax'
     return {'MATH_ENGINE': engine, 'REQUIRE_JAX': engine == 'jax', 'caniuse': caniuse}
