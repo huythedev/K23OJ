@@ -1,9 +1,8 @@
 import logging
 import re
-from html.parser import HTMLParser
 from urllib.parse import urlparse
 
-import markdown2
+from markdown_it import MarkdownIt
 from bleach.css_sanitizer import CSSSanitizer
 from bleach.sanitizer import Cleaner
 from django.conf import settings
@@ -89,17 +88,53 @@ def add_table_class(text):
     return text.replace(r'<table>', r'<table class="table">')
 
 
+def _render_code_block(code, language, attrs):
+    if language:
+        return str(highlight_code(code, language))
+    return ''
+
+
+def _add_nofollow(tree):
+    for a in tree.xpath('.//a[@href]'):
+        href = a.get('href')
+        if not href:
+            continue
+
+        parsed = urlparse(href)
+        # Relative URLs and anchors should not be marked nofollow.
+        if not parsed.netloc:
+            continue
+
+        hostname = (parsed.hostname or '').lower()
+        if hostname in NOFOLLOW_WHITELIST:
+            continue
+
+        rel_values = set((a.get('rel') or '').split())
+        rel_values.add('nofollow')
+        a.set('rel', ' '.join(sorted(rel_values)))
+
+
+def _mark_spoilers(tree):
+    # Keep support for markdown2-style spoiler blockquotes (`>! spoiler`).
+    for blockquote in tree.xpath('.//blockquote'):
+        first = blockquote[0] if len(blockquote) else None
+        if first is None or first.tag != 'p':
+            continue
+
+        text = first.text or ''
+        if not text.startswith('!'):
+            continue
+
+        first.text = text[1:].lstrip()
+        classes = set((blockquote.get('class') or '').split())
+        classes.add('spoiler')
+        blockquote.set('class', ' '.join(sorted(classes)))
+
+
 @registry.filter
 def markdown(text, style, math_engine=None, lazy_load=False, strip_paragraphs=False):
     styles = settings.MARKDOWN_STYLES.get(style, settings.MARKDOWN_DEFAULT_STYLE)
-    if styles.get('safe_mode', True):
-        safe_mode = 'escape'
-    else:
-        safe_mode = None
-
-    extras = ['latex', 'spoiler', 'fenced-code-blocks', 'cuddled-lists', 'tables', 'strike']
-    if styles.get('nofollow', True):
-        extras.append('nofollow')
+    safe_mode = styles.get('safe_mode', True)
 
     bleach_params = styles.get('bleach', {})
 
@@ -113,10 +148,22 @@ def markdown(text, style, math_engine=None, lazy_load=False, strip_paragraphs=Fa
 
     if styles.get('use_camo', False) and camo_client is not None:
         post_processors.append(camo_client.update_tree)
+    if styles.get('nofollow', True):
+        post_processors.append(_add_nofollow)
+    post_processors.append(_mark_spoilers)
     if lazy_load:
         post_processors.append(lazy_load_processor)
 
-    result = markdown2.markdown(text, safe_mode=safe_mode, extras=extras)
+    markdown_parser = MarkdownIt(
+        'commonmark',
+        options_update={
+            'html': not safe_mode,
+            'breaks': False,
+            'highlight': _render_code_block,
+        },
+    ).enable('table').enable('strikethrough')
+
+    result = markdown_parser.render(text)
 
     result = add_table_class(result)
     result = inc_header(result, 2)

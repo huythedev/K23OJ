@@ -1,6 +1,7 @@
 import re
 import logging
 from lxml import html
+from django.conf import settings
 from judge.utils.mathoid import MathoidMathParser
 from judge.utils.texoid import TexoidRenderer, TEXOID_ENABLED
 
@@ -104,7 +105,12 @@ def _replace_in_node(node, pattern, callback):
                 parent.insert(index, el)
 
 def mathoid(tree):
-    parser = MathoidMathParser('auto')
+    parser_type = getattr(settings, 'MATHOID_DEFAULT_TYPE', 'jax')
+    # In client-side KaTeX mode (often configured as 'auto'), keep raw delimiters.
+    if parser_type not in MathoidMathParser.types:
+        return
+
+    parser = MathoidMathParser(parser_type)
     pattern = re.compile(r'\\\[(.*?)\\\]|\\\((.*?)\\\)')
     
     def callback(match):

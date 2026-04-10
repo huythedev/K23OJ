@@ -102,6 +102,10 @@ def site_theme(request):
 def math_setting(request):
     caniuse = CanIUse(request.headers.get('user-agent', ''))
 
+    # Global override: disable client/server math rendering and keep raw markdown output.
+    if getattr(settings, 'DISABLE_MATH_RENDERING', False):
+        return {'MATH_ENGINE': 'tex', 'REQUIRE_JAX': False, 'caniuse': caniuse}
+
     # Middleware populating `profile` may not have loaded at this point if we're called from an error context.
     if hasattr(request.user, 'profile'):
         engine = request.profile.math_engine
