@@ -34,7 +34,7 @@ from reversion import revisions
 from judge.comments import CommentedDetailView
 from judge.forms import LanguageLimitFormSet, ProblemCloneForm, ProblemEditForm, ProblemEditTypeGroupForm, \
     ProblemImportPolygonForm, ProblemImportPolygonStatementFormSet, ProblemSubmitForm, ProposeProblemSolutionFormSet, \
-    ProblemAutoProblemForm, AutoProblemContestCreateForm
+    ProblemAutoProblemForm, AutoProblemContestCreateFormSet
 from judge.models import Contest, ContestProblem, ContestSubmission, Judge, Language, Organization, Problem, ProblemGroup, ProblemTestCase, \
     ProblemTranslation, ProblemType, RuntimeVersion, Solution, Submission, SubmissionSource, SubmissionSourceAccess, \
     ProblemData, problem_data_storage
@@ -1268,21 +1268,23 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
         profile = user.profile
         return any(org.is_admin(profile) for org in profile.organizations.all())
 
-    def _get_contest_form(self, created_items, target_organization=None, data=None):
-        initial = {
-            'available_problem_codes': ','.join(item['code'] for item in created_items),
+    def _get_contest_formset(self, created_items, target_organization=None, data=None):
+        kwargs = {
+            'prefix': 'contests',
+            'form_kwargs': {
+                'user': self.request.user,
+                'problem_choices': self._build_contest_problem_choices(created_items),
+                'target_organization': target_organization,
+            },
         }
+        if data is not None:
+            kwargs['data'] = data
+        return AutoProblemContestCreateFormSet(**kwargs)
 
-        return AutoProblemContestCreateForm(
-            data=data,
-            prefix='contest',
-            user=self.request.user,
-            problem_choices=self._build_contest_problem_choices(created_items),
-            target_organization=target_organization,
-            initial=initial,
-        )
-
-    def _build_contest_org_prefix_map(self, contest_form):
+    def _build_contest_org_prefix_map(self, contest_formset):
+        if not contest_formset.forms:
+            return {}
+        contest_form = contest_formset.forms[0]
         return {
             str(org.id): self._organization_prefix(org)
             for org in contest_form.fields['organization'].queryset
@@ -1306,6 +1308,34 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                 'url': reverse('problem_detail', args=[problem.code]),
             })
         return created_items
+
+    @staticmethod
+    def _parse_created_contest_keys(raw_keys):
+        if not raw_keys:
+            return []
+        return [key.strip() for key in raw_keys.split(',') if key.strip()]
+
+    @staticmethod
+    def _serialize_created_contest_keys(keys):
+        return ','.join(keys)
+
+    @staticmethod
+    def _build_created_contests(created_contest_keys):
+        contests_by_key = {
+            contest.key: contest
+            for contest in Contest.objects.filter(key__in=created_contest_keys)
+        }
+        created_contests = []
+        for key in created_contest_keys:
+            contest = contests_by_key.get(key)
+            if contest is None:
+                continue
+            created_contests.append({
+                'key': contest.key,
+                'name': contest.name,
+                'url': reverse('contest_view', args=[contest.key]),
+            })
+        return created_contests
 
     def _create_contest_from_autoproblem(self, contest_form):
         is_organization = contest_form.cleaned_data['is_organization']
@@ -1377,24 +1407,34 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
         return contest
 
     def _handle_contest_create_post(self, request, *args, **kwargs):
-        available_codes_raw = request.POST.get('contest-available_problem_codes', '')
+        available_codes_raw = request.POST.get('available_problem_codes', '')
         available_codes = [code.strip() for code in available_codes_raw.split(',') if code.strip()]
         created_items = self._build_report_created_from_codes(available_codes)
+        available_problem_codes_csv = ','.join(item['code'] for item in created_items)
+        created_contest_keys = self._parse_created_contest_keys(request.POST.get('created_contest_keys', ''))
 
-        contest_form = self._get_contest_form(created_items, data=request.POST)
-        if contest_form.is_valid():
-            contest = self._create_contest_from_autoproblem(contest_form)
-            if contest is not None:
-                return HttpResponseRedirect(reverse('contest_view', args=[contest.key]))
+        contest_formset = self._get_contest_formset(created_items, data=request.POST)
+        contests_created_in_submit = 0
+        contest_create_error = None
 
-        selected_org = contest_form.cleaned_data.get('organization') if contest_form.is_bound and contest_form.is_valid() else None
-        if selected_org is None and hasattr(contest_form, 'data'):
-            selected_org_id = contest_form.data.get('contest-organization')
-            if selected_org_id:
-                selected_org = contest_form.fields['organization'].queryset.filter(id=selected_org_id).first()
+        if contest_formset.is_valid():
+            for contest_form in contest_formset.forms:
+                if not contest_form.has_changed():
+                    continue
+                contest = self._create_contest_from_autoproblem(contest_form)
+                if contest is None:
+                    contest_create_error = _('Some contest forms contain invalid data. Please review and submit again.')
+                    break
+                contests_created_in_submit += 1
+                if contest.key not in created_contest_keys:
+                    created_contest_keys.append(contest.key)
 
-        contest_org_prefix = self._organization_prefix(selected_org)
-        contest_org_prefix_map_json = json.dumps(self._build_contest_org_prefix_map(contest_form))
+            if contests_created_in_submit > 0 and contest_create_error is None:
+                contest_formset = self._get_contest_formset(created_items)
+            elif contests_created_in_submit == 0 and contest_create_error is None:
+                contest_create_error = _('Please fill at least one contest form before creating contests.')
+
+        contest_org_prefix_map_json = json.dumps(self._build_contest_org_prefix_map(contest_formset))
 
         report = {
             'created': created_items,
@@ -1402,9 +1442,14 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
         }
         return self.render_to_response(self.get_context_data(
             report=report,
-            contest_form=contest_form,
-            contest_org_prefix=contest_org_prefix,
+            contest_formset=contest_formset,
             contest_org_prefix_map_json=contest_org_prefix_map_json,
+            contest_created_success=contests_created_in_submit > 0,
+            contests_created_in_submit=contests_created_in_submit,
+            contest_create_error=contest_create_error,
+            created_contests=self._build_created_contests(created_contest_keys),
+            created_contest_keys=self._serialize_created_contest_keys(created_contest_keys),
+            available_problem_codes_csv=available_problem_codes_csv,
         ))
 
     def post(self, request, *args, **kwargs):
@@ -1620,22 +1665,22 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
         except (zipfile.BadZipFile, OSError, ValueError) as e:
             return generic_message(self.request, _('Invalid upload package'), str(e), status=400)
 
-        contest_form = None
-        contest_org_prefix = ''
+        contest_formset = None
         can_create_contest = self._can_create_regular_contest() or self._can_create_any_organization_contest()
         if report['created'] and can_create_contest:
-            contest_form = self._get_contest_form(report['created'], target_organization=self.target_organization)
-            contest_org_prefix = self._organization_prefix(self.target_organization)
-            contest_org_prefix_map_json = json.dumps(self._build_contest_org_prefix_map(contest_form))
+            contest_formset = self._get_contest_formset(report['created'], target_organization=self.target_organization)
+            contest_org_prefix_map_json = json.dumps(self._build_contest_org_prefix_map(contest_formset))
         else:
             contest_org_prefix_map_json = json.dumps({})
 
         return self.render_to_response(self.get_context_data(
             form=form,
             report=report,
-            contest_form=contest_form,
-            contest_org_prefix=contest_org_prefix,
+            contest_formset=contest_formset,
             contest_org_prefix_map_json=contest_org_prefix_map_json,
+            created_contests=[],
+            created_contest_keys='',
+            available_problem_codes_csv=','.join(item['code'] for item in report['created']),
         ))
 
 

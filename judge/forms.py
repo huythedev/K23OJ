@@ -366,7 +366,6 @@ class AutoProblemContestCreateForm(Form):
         widget=forms.CheckboxSelectMultiple,
         required=True,
     )
-    available_problem_codes = forms.CharField(required=True, widget=forms.HiddenInput())
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
@@ -393,18 +392,8 @@ class AutoProblemContestCreateForm(Form):
             raise ValidationError(_('Contest id already exists.'))
         return contest_id
 
-    def clean_available_problem_codes(self):
-        raw = self.cleaned_data['available_problem_codes']
-        codes = [code.strip() for code in raw.split(',') if code.strip()]
-        if not codes:
-            raise ValidationError(_('No uploaded problems are available for contest creation.'))
-        return ','.join(codes)
-
     def clean(self):
         cleaned_data = super().clean()
-        available_raw = cleaned_data.get('available_problem_codes', '')
-        available_codes = {code for code in available_raw.split(',') if code}
-        selected = cleaned_data.get('selected_problems', [])
 
         if cleaned_data.get('is_organization'):
             organization = cleaned_data.get('organization')
@@ -418,10 +407,11 @@ class AutoProblemContestCreateForm(Form):
             if not self.user or not self.user.has_perm('judge.add_contest'):
                 raise ValidationError(_('You do not have permission to create regular contests.'))
             cleaned_data['organization'] = None
-
-        if selected and any(code not in available_codes for code in selected):
-            raise ValidationError(_('Selected problems must come from the newly uploaded problem list.'))
         return cleaned_data
+
+
+class AutoProblemContestCreateFormSet(formset_factory(AutoProblemContestCreateForm, extra=1)):
+    pass
 
 
 class ProblemImportPolygonStatementForm(Form):
