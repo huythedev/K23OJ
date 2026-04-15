@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 import zipfile
 from datetime import timedelta
 from operator import itemgetter
@@ -12,6 +13,7 @@ import yaml
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.core.files import File
 from django.db import transaction
 from django.db.models import BooleanField, Case, F, Prefetch, Q, When
 from django.db.utils import ProgrammingError
@@ -31,9 +33,12 @@ from reversion import revisions
 
 from judge.comments import CommentedDetailView
 from judge.forms import LanguageLimitFormSet, ProblemCloneForm, ProblemEditForm, ProblemEditTypeGroupForm, \
-    ProblemImportPolygonForm, ProblemImportPolygonStatementFormSet, ProblemSubmitForm, ProposeProblemSolutionFormSet
+    ProblemImportPolygonForm, ProblemImportPolygonStatementFormSet, ProblemSubmitForm, ProposeProblemSolutionFormSet, \
+    ProblemAutoProblemForm
 from judge.models import ContestSubmission, Judge, Language, Problem, ProblemGroup, ProblemTestCase, \
-    ProblemTranslation, ProblemType, RuntimeVersion, Solution, Submission, SubmissionSource, problem_data_storage
+    ProblemTranslation, ProblemType, RuntimeVersion, Solution, Submission, SubmissionSource, SubmissionSourceAccess, \
+    ProblemData, problem_data_storage
+from judge.models.problem import ProblemTestcaseAccess
 from judge.tasks import on_new_problem
 from judge.template_context import misc_config
 from judge.utils.codeforces_polygon import ImportPolygonError, PolygonImporter
@@ -41,6 +46,7 @@ from judge.utils.diggpaginator import DiggPaginator
 from judge.utils.opengraph import generate_opengraph
 from judge.utils.pdfoid import PDF_RENDERING_ENABLED, render_pdf
 from judge.utils.problem_data import get_visible_content
+from judge.utils.problem_data import ProblemDataCompiler, get_visible_content
 from judge.utils.problems import hot_problems, user_attempted_ids, \
     user_completed_ids
 from judge.utils.strings import safe_float_or_none, safe_int_or_none
@@ -661,6 +667,7 @@ class RandomProblem(ProblemList):
 
 user_logger = logging.getLogger('judge.user')
 user_submit_ip_logger = logging.getLogger('judge.user_submit_ip_logger')
+autoproblem_logger = logging.getLogger('judge.problem.autoproblem')
 
 
 class ProblemSubmit(LoginRequiredMixin, ProblemMixin, TitleMixin, SingleObjectFormView):
@@ -1057,6 +1064,351 @@ class ProblemImportPolygon(PermissionRequiredMixin, TitleMixin, FormView):
             return HttpResponseRedirect(reverse('problem_detail', args=[code]))
 
         return self.render_to_response(self.get_context_data())
+
+
+class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
+    title = gettext_lazy('Bulk upload problems from package')
+    template_name = 'problem/autoproblem.html'
+    form_class = ProblemAutoProblemForm
+    permission_required = 'judge.add_problem'
+
+    def has_permission(self):
+        user = self.request.user
+        if user.has_perm('judge.add_problem'):
+            return True
+
+        if not user.has_perm('judge.create_organization_problem'):
+            return False
+
+        profile = user.profile
+        return any(org.is_admin(profile) for org in profile.organizations.all())
+
+    @staticmethod
+    def _safe_extract_archive(archive, target_dir):
+        target_dir = os.path.abspath(target_dir)
+        for member in archive.namelist():
+            member_path = os.path.abspath(os.path.join(target_dir, member))
+            if os.path.commonpath((target_dir, member_path)) != target_dir:
+                raise ValueError('Archive contains unsafe paths')
+        archive.extractall(target_dir)
+
+    @staticmethod
+    def _sanitize_problem_code(filename):
+        raw_code = os.path.splitext(os.path.basename(filename))[0]
+        sanitized = re.sub(r'[^A-Za-z0-9_]', '_', raw_code)
+        sanitized = re.sub(r'_+', '_', sanitized).strip('_').lower()
+        return sanitized
+
+    @staticmethod
+    def _parse_markdown_statement(markdown_content, problem_code):
+        if not markdown_content:
+            return problem_code, ''
+
+        lines = markdown_content.splitlines()
+        if not lines:
+            return problem_code, ''
+
+        first_line = lines[0].strip()
+        if first_line.startswith('# '):
+            problem_name = first_line[2:].strip() or problem_code
+            statement = '\n'.join(lines[1:])
+            return problem_name, statement
+
+        return problem_code, markdown_content
+
+    @staticmethod
+    def _natural_sort_key(path):
+        parts = re.split(r'(\d+)', path.lower())
+        return [int(part) if part.isdigit() else part for part in parts]
+
+    @staticmethod
+    def _filter_valid_archive_files(file_list):
+        return [
+            file_name for file_name in file_list
+            if not file_name.startswith('__MACOSX/') and
+            not file_name.startswith('._') and
+            '/._' not in file_name and
+            not file_name.endswith('/.DS_Store') and
+            file_name != '.DS_Store'
+        ]
+
+    @classmethod
+    def _detect_testcase_pairs(cls, valid_files):
+        in_files = []
+        out_files = []
+        detected_format = -1
+
+        in_patterns = [
+            re.compile(r'^(.+\.inp|.+\.in|inp|in)$'),
+            re.compile(r'^input\.(.+\d+)$'),
+            re.compile(r'^(.+\d+)$'),
+        ]
+        out_patterns = [
+            re.compile(r'^(.+\.out|.+\.ok|.+\.ans|.+\.sol|out|ok|ans|sol)$'),
+            re.compile(r'^output\.(.+\d+)$'),
+            re.compile(r'^(.+\d+\.a)$'),
+        ]
+
+        for file_name in valid_files:
+            tested_name = os.path.basename(file_name).lower()
+            for idx in range(3):
+                if in_patterns[idx].match(tested_name):
+                    if detected_format not in (-1, idx):
+                        return []
+                    detected_format = idx
+                    in_files.append(file_name)
+                    break
+                if out_patterns[idx].match(tested_name):
+                    if detected_format not in (-1, idx):
+                        return []
+                    detected_format = idx
+                    out_files.append(file_name)
+                    break
+
+        if not in_files or len(in_files) != len(out_files):
+            return []
+
+        in_files.sort(key=cls._natural_sort_key)
+        out_files.sort(key=cls._natural_sort_key)
+        return list(zip(in_files, out_files))
+
+    def build_problem_code(self, sanitized_code):
+        if self.target_organization is not None:
+            prefix = ''.join(x for x in self.target_organization.slug.lower() if x.isalnum()) + '_'
+            return prefix + sanitized_code
+        return sanitized_code
+
+    def get_testcase_archive_candidates(self, sanitized_code, problem_code):
+        if self.target_organization is not None and sanitized_code != problem_code:
+            return ['%s.zip' % sanitized_code, '%s.zip' % problem_code]
+        return ['%s.zip' % problem_code]
+
+    def assign_problem_ownership(self, problem):
+        if self.target_organization is not None:
+            problem.authors.add(self.request.user.profile)
+            problem.is_organization_private = True
+            problem.organizations.add(self.target_organization)
+            return
+        problem.curators.add(self.request.profile)
+
+    def post_problem_created(self, problem):
+        if self.target_organization is not None:
+            try:
+                on_new_problem.delay(problem.code)
+            except Exception:
+                autoproblem_logger.exception('Failed to schedule on_new_problem for %s', problem.code)
+        return None
+
+    @staticmethod
+    def _find_uncategorized_defaults():
+        group = ProblemGroup.objects.filter(name__iexact='Uncategorized').first()
+        if group is None:
+            group = ProblemGroup.objects.order_by('id').first()
+
+        type_ = ProblemType.objects.filter(name__iexact='uncategorized').first()
+        if type_ is None:
+            type_ = ProblemType.objects.order_by('id').first()
+
+        return group, type_
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.setdefault('report', None)
+        return context
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        self.target_organization = form.cleaned_data.get('organization') if form.cleaned_data.get('is_organization') else None
+        package = form.cleaned_data['package']
+        report = {
+            'created': [],
+            'skipped': [],
+        }
+
+        default_group, default_type = self._find_uncategorized_defaults()
+        if default_group is None or default_type is None:
+            return generic_message(
+                self.request,
+                _('Cannot create problem'),
+                _('Problem groups/types are missing. Please create at least one group and one type first.'),
+                status=400,
+            )
+
+        try:
+            with zipfile.ZipFile(package.file) as archive:
+                with tempfile.TemporaryDirectory(prefix='autoproblem_') as extract_dir:
+                    self._safe_extract_archive(archive, extract_dir)
+
+                    markdown_paths = []
+                    for root, _dirs, files in os.walk(extract_dir):
+                        for file_name in files:
+                            if file_name.lower().endswith('.md'):
+                                markdown_paths.append(os.path.join(root, file_name))
+
+                    markdown_paths.sort(key=lambda path: os.path.relpath(path, extract_dir))
+
+                    seen_codes = set()
+                    allowed_languages = Language.objects.filter(include_in_problem=True)
+                    for markdown_path in markdown_paths:
+                        markdown_filename = os.path.basename(markdown_path)
+                        sanitized_code = self._sanitize_problem_code(markdown_filename)
+                        problem_code = self.build_problem_code(sanitized_code)
+
+                        if not problem_code:
+                            reason = _('Filename produced an empty problem code after sanitization.')
+                            report['skipped'].append({'file': markdown_filename, 'reason': reason})
+                            autoproblem_logger.warning('Skipping markdown file %s: empty sanitized code', markdown_filename)
+                            continue
+
+                        if problem_code in seen_codes:
+                            reason = _('Duplicate sanitized code inside upload package.')
+                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                            autoproblem_logger.warning(
+                                'Skipping markdown file %s: duplicate sanitized code %s inside package',
+                                markdown_filename,
+                                problem_code,
+                            )
+                            continue
+                        seen_codes.add(problem_code)
+
+                        if Problem.objects.filter(code=problem_code).exists():
+                            reason = _('Problem code already exists in database.')
+                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                            autoproblem_logger.warning(
+                                'Skipping markdown file %s: code %s already exists',
+                                markdown_filename,
+                                problem_code,
+                            )
+                            continue
+
+                        testcase_archive = None
+                        testcase_path = None
+                        for candidate_archive in self.get_testcase_archive_candidates(sanitized_code, problem_code):
+                            candidate_path = os.path.join(os.path.dirname(markdown_path), candidate_archive)
+                            if os.path.isfile(candidate_path):
+                                testcase_archive = candidate_archive
+                                testcase_path = candidate_path
+                                break
+
+                        if testcase_path is None:
+                            expected_archive = self.get_testcase_archive_candidates(sanitized_code, problem_code)[0]
+                            reason = _('Missing testcase archive %(archive)s in the same directory.') % {
+                                'archive': expected_archive,
+                            }
+                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                            autoproblem_logger.warning(
+                                'Skipping markdown file %s: testcase archive %s missing',
+                                markdown_filename,
+                                expected_archive,
+                            )
+                            continue
+
+                        try:
+                            with zipfile.ZipFile(testcase_path, 'r') as testcase_zip:
+                                valid_files = self._filter_valid_archive_files(testcase_zip.namelist())
+                        except zipfile.BadZipFile:
+                            reason = _('Invalid testcase archive %(archive)s.') % {
+                                'archive': testcase_archive,
+                            }
+                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                            autoproblem_logger.warning(
+                                'Skipping markdown file %s: invalid testcase archive %s',
+                                markdown_filename,
+                                testcase_archive,
+                            )
+                            continue
+
+                        testcase_pairs = self._detect_testcase_pairs(valid_files)
+                        if not testcase_pairs:
+                            reason = _('Could not detect matching input/output testcase pairs in %(archive)s.') % {
+                                'archive': testcase_archive,
+                            }
+                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                            autoproblem_logger.warning(
+                                'Skipping markdown file %s: no recognizable testcase pairs in %s',
+                                markdown_filename,
+                                testcase_archive,
+                            )
+                            continue
+
+                        with open(markdown_path, 'r', encoding='utf-8-sig', errors='replace') as statement_file:
+                            markdown_content = statement_file.read()
+                        problem_name, problem_statement = self._parse_markdown_statement(markdown_content, problem_code)
+
+                        with transaction.atomic():
+                            with revisions.create_revision(atomic=True):
+                                problem = Problem.objects.create(
+                                    code=problem_code,
+                                    name=problem_name,
+                                    description=problem_statement,
+                                    time_limit=1,
+                                    memory_limit=262144,
+                                    points=1,
+                                    partial=True,
+                                    group=default_group,
+                                    submission_source_visibility_mode=SubmissionSourceAccess.FOLLOW,
+                                    testcase_visibility_mode=ProblemTestcaseAccess.AUTHOR_ONLY,
+                                    date=timezone.now(),
+                                )
+                                self.assign_problem_ownership(problem)
+                                problem.types.add(default_type)
+                                problem.allowed_languages.set(allowed_languages)
+
+                                problem_data = ProblemData.objects.create(problem=problem)
+                                with open(testcase_path, 'rb') as testcase_file:
+                                    testcase_basename = os.path.basename(testcase_path)
+                                    problem_data.zipfile.save(testcase_basename, File(testcase_file), save=True)
+
+
+
+                                cases = [
+                                    ProblemTestCase(
+                                        dataset=problem,
+                                        order=index,
+                                        type='C',
+                                        input_file=input_file,
+                                        output_file=output_file,
+                                        points=1,
+                                        is_pretest=False,
+                                        is_sample=False,
+                                    )
+                                    for index, (input_file, output_file) in enumerate(testcase_pairs, start=1)
+                                ]
+                                ProblemTestCase.objects.bulk_create(cases)
+
+                                # Fetch and save each testcase to trigger model save logic (like Apply button)
+                                for testcase in ProblemTestCase.objects.filter(dataset=problem):
+                                    # Ensure all required fields are set (add more if needed)
+                                    if testcase.points is None:
+                                        testcase.points = 1
+                                    if testcase.is_pretest is None:
+                                        testcase.is_pretest = False
+                                    if testcase.is_sample is None:
+                                        testcase.is_sample = False
+                                    testcase.save()
+
+                                ProblemDataCompiler.generate(problem, problem_data, problem.cases.order_by('order'), valid_files)
+
+                                revisions.set_comment(_('Bulk-created from /autoproblem upload'))
+                                revisions.set_user(self.request.user)
+
+                            self.post_problem_created(problem)
+
+                        report['created'].append({
+                            'file': markdown_filename,
+                            'code': problem_code,
+                            'name': problem_name,
+                            'url': reverse('problem_detail', args=[problem_code]),
+                        })
+
+        except (zipfile.BadZipFile, OSError, ValueError) as e:
+            return generic_message(self.request, _('Invalid upload package'), str(e), status=400)
+
+        return self.render_to_response(self.get_context_data(form=form, report=report))
 
 
 class ProblemUpdatePolygon(ProblemImportPolygon, ProblemMixin, SingleObjectMixin):

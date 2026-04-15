@@ -18,6 +18,12 @@
             <a href="{{ url('problem_import_polygon') }}">{{ _('Import problem from Codeforces Polygon package') }}</a>
         </div>
     {% endif %}
+    {% if perms.judge.add_problem %}
+        <div class="alert alert-warning alert-dismissable">
+            <a class="close">x</a>
+            <a href="{{ url('problem_autoproblem') }}">{{ _('Bulk upload problems from package') }}</a>
+        </div>
+    {% endif %}
     <form action="" method="post" class="form-area" enctype="multipart/form-data" style="display: flex; justify-content: center; flex-direction: column;">
         {% csrf_token %}
         <table class="django-as-table">{{ form.as_table() }}</table>

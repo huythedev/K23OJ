@@ -287,6 +287,65 @@ class ProblemImportPolygonForm(Form):
             self.fields['do_update'].initial = True
 
 
+class ProblemAutoProblemForm(Form):
+    package = forms.FileField(
+        label=_('Package'),
+        validators=[FileExtensionValidator(allowed_extensions=['zip'])],
+        widget=forms.FileInput(attrs={'accept': 'application/zip'}),
+    )
+    is_organization = forms.BooleanField(required=False, label=_('Create as organization problems'))
+    organization = forms.ModelChoiceField(
+        queryset=Organization.objects.none(),
+        required=False,
+        label=_('Organization'),
+        widget=Select2Widget(attrs={'style': 'width: 300px'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        self.force_organization_mode = False
+        self.fields['organization'].empty_label = None
+
+        if self.user is None or not self.user.is_authenticated:
+            return
+
+        profile = self.user.profile
+        manageable_org_ids = [org.id for org in profile.organizations.all() if org.is_admin(profile)]
+        self.fields['organization'].queryset = Organization.objects.filter(id__in=manageable_org_ids)
+
+        has_global_permission = self.user.has_perm('judge.add_problem')
+        has_org_permission = self.user.has_perm('judge.create_organization_problem')
+        if not has_global_permission and has_org_permission:
+            self.force_organization_mode = True
+            self.fields['is_organization'].initial = True
+            self.fields['is_organization'].disabled = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        if self.force_organization_mode:
+            cleaned_data['is_organization'] = True
+
+        if not cleaned_data.get('is_organization'):
+            if not self.user or not self.user.has_perm('judge.add_problem'):
+                raise ValidationError(_('You do not have permission to create regular problems.'))
+            cleaned_data['organization'] = None
+            return cleaned_data
+
+        if not self.user or not self.user.has_perm('judge.create_organization_problem'):
+            raise ValidationError(_('You do not have permission to create organization problems.'))
+
+        if not cleaned_data.get('organization'):
+            raise ValidationError(_('Please choose an organization.'))
+
+        if not cleaned_data['organization'].is_admin(self.user.profile):
+            raise ValidationError(_('You are not allowed to create problems for this organization.'))
+
+        return cleaned_data
+
+
 class ProblemImportPolygonStatementForm(Form):
     polygon_language = forms.CharField()
     site_language = forms.CharField()

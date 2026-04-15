@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block js_media %}
+    <script type="text/javascript">
+        $(function () {
+            const $isOrganization = $('#id_is_organization');
+            const $organizationRow = $('#id_organization').closest('tr');
+
+            function toggleOrganizationRow() {
+                $organizationRow.toggle($isOrganization.is(':checked'));
+            }
+
+            $isOrganization.on('change', toggleOrganizationRow);
+            toggleOrganizationRow();
+        });
+    </script>
+{% endblock %}
+
+{% block media %}
+    {{ form.media.css }}
+    <link rel="stylesheet" type="text/css" href="{{ static('ui_form.css') }}">
+{% endblock %}
+
+{% block body %}
+    <form action="" method="post" class="form-area centered-form" enctype="multipart/form-data" style="display: flex; justify-content: center; flex-direction: column;">
+        {% csrf_token %}
+        <table class="django-as-table">{{ form.as_table() }}</table>
+        <hr>
+        <div style="display: flex; justify-content: flex-end;"><input type="submit" value="{{ _('Upload') }}" class="button"></div>
+    </form>
+
+    {% if report %}
+        <div class="form-area centered-form" style="margin-top: 1.5em;">
+            <h3>{{ _('Bulk upload result') }}</h3>
+            <p>
+                {{ _('Created') }}: <b>{{ report.created|length }}</b>
+                &nbsp;|&nbsp;
+                {{ _('Skipped') }}: <b>{{ report.skipped|length }}</b>
+            </p>
+
+            {% if report.created %}
+                <h4>{{ _('Created problems') }}</h4>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>{{ _('Markdown file') }}</th>
+                            <th>{{ _('Problem code') }}</th>
+                            <th>{{ _('Problem name') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in report.created %}
+                            <tr>
+                                <td>{{ item.file }}</td>
+                                <td><a href="{{ item.url }}">{{ item.code }}</a></td>
+                                <td>{{ item.name }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+            {% if report.skipped %}
+                <h4>{{ _('Skipped files') }}</h4>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>{{ _('Markdown file') }}</th>
+                            <th>{{ _('Problem code') }}</th>
+                            <th>{{ _('Reason') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in report.skipped %}
+                            <tr>
+                                <td>{{ item.file }}</td>
+                                <td>{{ item.code|default('-') }}</td>
+                                <td>{{ item.reason }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

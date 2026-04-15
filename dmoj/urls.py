@@ -103,6 +103,7 @@ def paged_list_view(view, name):
 
 urlpatterns = [
     path('', blog.PostList.as_view(template_name='home.html', title=_('Home')), kwargs={'page': 1}, name='home'),
+    path('autoproblem', problem.ProblemAutoProblem.as_view(), name='problem_autoproblem'),
     path('500/', exception),
     path('admin/', admin.site.urls),
     path('i18n/', include('django.conf.urls.i18n')),
@@ -115,6 +116,7 @@ urlpatterns = [
         path('/suggest_list/', problem.SuggestList.as_view(), name='problem_suggest_list'),
         path('/suggest', problem.ProblemSuggest.as_view(), name='problem_suggest'),
         path('/create', problem.ProblemCreate.as_view(), name='problem_create'),
+        path('/autoproblem', problem.ProblemAutoProblem.as_view(), name='problem_autoproblem_legacy'),
         path('/import-polygon', problem.ProblemImportPolygon.as_view(), name='problem_import_polygon'),
     ])),
 
