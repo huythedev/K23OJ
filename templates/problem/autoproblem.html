@@ -12,6 +12,39 @@
 
             $isOrganization.on('change', toggleOrganizationRow);
             toggleOrganizationRow();
+
+            const $contestIsOrganization = $('#id_contest-is_organization');
+            const $contestOrganization = $('#id_contest-organization');
+            const $contestId = $('#id_contest-contest_id');
+            const contestOrgPrefix = $('#contest-org-prefix').val() || '';
+            const contestOrgPrefixMap = JSON.parse($('#contest-org-prefix-map').val() || '{}');
+
+            const $contestOrganizationRow = $contestOrganization.closest('tr');
+
+            function getSelectedContestOrgPrefix() {
+                const selectedOrgId = $contestOrganization.val();
+                if (!selectedOrgId) {
+                    return '';
+                }
+                return contestOrgPrefixMap[selectedOrgId] || '';
+            }
+
+            function toggleContestIdPrefix() {
+                if ($contestIsOrganization.length === 0 || $contestId.length === 0) {
+                    return;
+                }
+                $contestOrganizationRow.toggle($contestIsOrganization.is(':checked'));
+                if ($contestIsOrganization.is(':checked')) {
+                    const selectedPrefix = getSelectedContestOrgPrefix() || contestOrgPrefix;
+                    $contestId.val(selectedPrefix);
+                }
+            }
+
+            if ($contestIsOrganization.length) {
+                $contestIsOrganization.on('change', toggleContestIdPrefix);
+                $contestOrganization.on('change', toggleContestIdPrefix);
+                toggleContestIdPrefix();
+            }
         });
     </script>
 {% endblock %}
@@ -22,8 +55,11 @@
 {% endblock %}
 
 {% block body %}
+    <input type="hidden" id="contest-org-prefix" value="{{ contest_org_prefix|default('') }}">
+    <input type="hidden" id="contest-org-prefix-map" value="{{ contest_org_prefix_map_json|default('{}')|escape }}">
     <form action="" method="post" class="form-area centered-form" enctype="multipart/form-data" style="display: flex; justify-content: center; flex-direction: column;">
         {% csrf_token %}
+        <input type="hidden" name="form_action" value="upload">
         <table class="django-as-table">{{ form.as_table() }}</table>
         <hr>
         <div style="display: flex; justify-content: flex-end;"><input type="submit" value="{{ _('Upload') }}" class="button"></div>
@@ -58,6 +94,19 @@
                         {% endfor %}
                     </tbody>
                 </table>
+
+                {% if contest_form %}
+                    <hr>
+                    <h4>{{ _('Create contest from uploaded problems') }}</h4>
+                    <form action="" method="post" class="form-area" style="margin-top: 1em;">
+                        {% csrf_token %}
+                        <input type="hidden" name="form_action" value="create_contest">
+                        <table class="django-as-table">{{ contest_form.as_table() }}</table>
+                        <div style="display: flex; justify-content: flex-end; margin-top: 0.8em;">
+                            <input type="submit" value="{{ _('Create Contest') }}" class="button">
+                        </div>
+                    </form>
+                {% endif %}
             {% endif %}
 
             {% if report.skipped %}

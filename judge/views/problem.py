@@ -34,12 +34,12 @@ from reversion import revisions
 from judge.comments import CommentedDetailView
 from judge.forms import LanguageLimitFormSet, ProblemCloneForm, ProblemEditForm, ProblemEditTypeGroupForm, \
     ProblemImportPolygonForm, ProblemImportPolygonStatementFormSet, ProblemSubmitForm, ProposeProblemSolutionFormSet, \
-    ProblemAutoProblemForm
-from judge.models import ContestSubmission, Judge, Language, Problem, ProblemGroup, ProblemTestCase, \
+    ProblemAutoProblemForm, AutoProblemContestCreateForm
+from judge.models import Contest, ContestProblem, ContestSubmission, Judge, Language, Organization, Problem, ProblemGroup, ProblemTestCase, \
     ProblemTranslation, ProblemType, RuntimeVersion, Solution, Submission, SubmissionSource, SubmissionSourceAccess, \
     ProblemData, problem_data_storage
 from judge.models.problem import ProblemTestcaseAccess
-from judge.tasks import on_new_problem
+from judge.tasks import on_new_contest, on_new_problem
 from judge.template_context import misc_config
 from judge.utils.codeforces_polygon import ImportPolygonError, PolygonImporter
 from judge.utils.diggpaginator import DiggPaginator
@@ -1237,6 +1237,181 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
         kwargs['user'] = self.request.user
         return kwargs
 
+    @staticmethod
+    def _organization_prefix(organization):
+        if organization is None:
+            return ''
+        return ''.join(x for x in organization.slug.lower() if x.isalnum()) + '_'
+
+    @staticmethod
+    def _build_contest_problem_choices(created_items):
+        return [
+            (item['code'], '%s - %s' % (item['code'], item['name']))
+            for item in created_items
+        ]
+
+    def _can_create_organization_contest(self, organization):
+        user = self.request.user
+        if organization is None:
+            return False
+        if not user.has_perm('judge.create_private_contest'):
+            return False
+        return organization.is_admin(user.profile)
+
+    def _can_create_regular_contest(self):
+        return self.request.user.has_perm('judge.add_contest')
+
+    def _can_create_any_organization_contest(self):
+        user = self.request.user
+        if not user.has_perm('judge.create_private_contest'):
+            return False
+        profile = user.profile
+        return any(org.is_admin(profile) for org in profile.organizations.all())
+
+    def _get_contest_form(self, created_items, target_organization=None, data=None):
+        initial = {
+            'available_problem_codes': ','.join(item['code'] for item in created_items),
+        }
+
+        return AutoProblemContestCreateForm(
+            data=data,
+            prefix='contest',
+            user=self.request.user,
+            problem_choices=self._build_contest_problem_choices(created_items),
+            target_organization=target_organization,
+            initial=initial,
+        )
+
+    def _build_contest_org_prefix_map(self, contest_form):
+        return {
+            str(org.id): self._organization_prefix(org)
+            for org in contest_form.fields['organization'].queryset
+        }
+
+    def _build_report_created_from_codes(self, problem_codes):
+        problems_by_code = {
+            problem.code: problem
+            for problem in Problem.objects.filter(code__in=problem_codes)
+        }
+
+        created_items = []
+        for code in problem_codes:
+            problem = problems_by_code.get(code)
+            if problem is None:
+                continue
+            created_items.append({
+                'file': '-',
+                'code': problem.code,
+                'name': problem.name,
+                'url': reverse('problem_detail', args=[problem.code]),
+            })
+        return created_items
+
+    def _create_contest_from_autoproblem(self, contest_form):
+        is_organization = contest_form.cleaned_data['is_organization']
+        organization = contest_form.cleaned_data.get('organization')
+        selected_codes = contest_form.cleaned_data['selected_problems']
+
+        if is_organization:
+            if not self._can_create_organization_contest(organization):
+                contest_form.add_error('is_organization', _('You do not have permission to create organization contests.'))
+                return None
+        elif not self._can_create_regular_contest():
+            contest_form.add_error('is_organization', _('You do not have permission to create regular contests.'))
+            return None
+
+        selected_problems = list(Problem.objects.filter(code__in=selected_codes))
+        selected_problem_codes = {problem.code for problem in selected_problems}
+        if len(selected_problem_codes) != len(set(selected_codes)):
+            contest_form.add_error('selected_problems', _('One or more selected problems were not found.'))
+            return None
+
+        for problem in selected_problems:
+            if not problem.is_editable_by(self.request.user):
+                contest_form.add_error('selected_problems', _('One or more selected problems are not editable by you.'))
+                return None
+
+        order_map = {code: index for index, code in enumerate(selected_codes, start=1)}
+        now = timezone.now()
+
+        with revisions.create_revision(atomic=True):
+            contest = Contest.objects.create(
+                key=contest_form.cleaned_data['contest_id'],
+                name=contest_form.cleaned_data['contest_name'],
+                start_time=now,
+                end_time=now + timedelta(minutes=10),
+                is_visible=False,
+                use_clarifications=True,
+                hide_problem_tags=False,
+                hide_problem_authors=False,
+                show_short_display=False,
+                scoreboard_visibility=Contest.SCOREBOARD_VISIBLE,
+                format_name='default',
+            )
+            contest.authors.add(self.request.profile)
+
+            if is_organization:
+                contest.is_organization_private = True
+                contest.save(update_fields=('is_organization_private',))
+                contest.organizations.add(organization)
+
+            contest_problems = [
+                ContestProblem(
+                    contest=contest,
+                    problem=problem,
+                    points=1,
+                    order=order_map[problem.code],
+                    partial=True,
+                )
+                for problem in selected_problems
+            ]
+            ContestProblem.objects.bulk_create(contest_problems)
+
+            revisions.set_comment(_('Created contest from /autoproblem upload'))
+            revisions.set_user(self.request.user)
+
+        try:
+            on_new_contest.delay(contest.key)
+        except Exception:
+            autoproblem_logger.exception('Failed to schedule on_new_contest for %s', contest.key)
+        return contest
+
+    def _handle_contest_create_post(self, request, *args, **kwargs):
+        available_codes_raw = request.POST.get('contest-available_problem_codes', '')
+        available_codes = [code.strip() for code in available_codes_raw.split(',') if code.strip()]
+        created_items = self._build_report_created_from_codes(available_codes)
+
+        contest_form = self._get_contest_form(created_items, data=request.POST)
+        if contest_form.is_valid():
+            contest = self._create_contest_from_autoproblem(contest_form)
+            if contest is not None:
+                return HttpResponseRedirect(reverse('contest_view', args=[contest.key]))
+
+        selected_org = contest_form.cleaned_data.get('organization') if contest_form.is_bound and contest_form.is_valid() else None
+        if selected_org is None and hasattr(contest_form, 'data'):
+            selected_org_id = contest_form.data.get('contest-organization')
+            if selected_org_id:
+                selected_org = contest_form.fields['organization'].queryset.filter(id=selected_org_id).first()
+
+        contest_org_prefix = self._organization_prefix(selected_org)
+        contest_org_prefix_map_json = json.dumps(self._build_contest_org_prefix_map(contest_form))
+
+        report = {
+            'created': created_items,
+            'skipped': [],
+        }
+        return self.render_to_response(self.get_context_data(
+            report=report,
+            contest_form=contest_form,
+            contest_org_prefix=contest_org_prefix,
+            contest_org_prefix_map_json=contest_org_prefix_map_json,
+        ))
+
+    def post(self, request, *args, **kwargs):
+        if request.POST.get('form_action') == 'create_contest':
+            return self._handle_contest_create_post(request, *args, **kwargs)
+        return super().post(request, *args, **kwargs)
+
     def form_valid(self, form):
         self.target_organization = form.cleaned_data.get('organization') if form.cleaned_data.get('is_organization') else None
         package = form.cleaned_data['package']
@@ -1445,7 +1620,23 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
         except (zipfile.BadZipFile, OSError, ValueError) as e:
             return generic_message(self.request, _('Invalid upload package'), str(e), status=400)
 
-        return self.render_to_response(self.get_context_data(form=form, report=report))
+        contest_form = None
+        contest_org_prefix = ''
+        can_create_contest = self._can_create_regular_contest() or self._can_create_any_organization_contest()
+        if report['created'] and can_create_contest:
+            contest_form = self._get_contest_form(report['created'], target_organization=self.target_organization)
+            contest_org_prefix = self._organization_prefix(self.target_organization)
+            contest_org_prefix_map_json = json.dumps(self._build_contest_org_prefix_map(contest_form))
+        else:
+            contest_org_prefix_map_json = json.dumps({})
+
+        return self.render_to_response(self.get_context_data(
+            form=form,
+            report=report,
+            contest_form=contest_form,
+            contest_org_prefix=contest_org_prefix,
+            contest_org_prefix_map_json=contest_org_prefix_map_json,
+        ))
 
 
 class ProblemUpdatePolygon(ProblemImportPolygon, ProblemMixin, SingleObjectMixin):

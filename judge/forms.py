@@ -346,6 +346,84 @@ class ProblemAutoProblemForm(Form):
         return cleaned_data
 
 
+class AutoProblemContestCreateForm(Form):
+    contest_name = forms.CharField(max_length=100, label=_('Contest Name'))
+    is_organization = forms.BooleanField(required=False, label=_('Create as organization contest'))
+    organization = forms.ModelChoiceField(
+        queryset=Organization.objects.none(),
+        required=False,
+        label=_('Organization'),
+        widget=Select2Widget(attrs={'style': 'width: 300px'}),
+    )
+    contest_id = forms.CharField(
+        max_length=64,
+        label=_('Contest ID'),
+        validators=[RegexValidator('^[a-z0-9_]+$', _('Contest id must be ^[a-z0-9_]+$'))],
+    )
+    selected_problems = forms.MultipleChoiceField(
+        choices=(),
+        label=_('Selected Problems'),
+        widget=forms.CheckboxSelectMultiple,
+        required=True,
+    )
+    available_problem_codes = forms.CharField(required=True, widget=forms.HiddenInput())
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        self.problem_choices = kwargs.pop('problem_choices', [])
+        target_organization = kwargs.pop('target_organization', None)
+        super().__init__(*args, **kwargs)
+        self.fields['selected_problems'].choices = self.problem_choices
+
+        manageable_org_ids = []
+        if self.user is not None and self.user.is_authenticated:
+            profile = self.user.profile
+            manageable_org_ids = [org.id for org in profile.organizations.all() if org.is_admin(profile)]
+
+        self.fields['organization'].queryset = Organization.objects.filter(id__in=manageable_org_ids)
+        self.fields['organization'].empty_label = None
+
+        if target_organization is not None and target_organization.id in manageable_org_ids:
+            self.fields['organization'].initial = target_organization
+            self.fields['is_organization'].initial = True
+
+    def clean_contest_id(self):
+        contest_id = self.cleaned_data['contest_id']
+        if Contest.objects.filter(key=contest_id).exists():
+            raise ValidationError(_('Contest id already exists.'))
+        return contest_id
+
+    def clean_available_problem_codes(self):
+        raw = self.cleaned_data['available_problem_codes']
+        codes = [code.strip() for code in raw.split(',') if code.strip()]
+        if not codes:
+            raise ValidationError(_('No uploaded problems are available for contest creation.'))
+        return ','.join(codes)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        available_raw = cleaned_data.get('available_problem_codes', '')
+        available_codes = {code for code in available_raw.split(',') if code}
+        selected = cleaned_data.get('selected_problems', [])
+
+        if cleaned_data.get('is_organization'):
+            organization = cleaned_data.get('organization')
+            if organization is None:
+                raise ValidationError(_('Please choose an organization.'))
+            if not self.user or not self.user.has_perm('judge.create_private_contest'):
+                raise ValidationError(_('You do not have permission to create organization contests.'))
+            if not organization.is_admin(self.user.profile):
+                raise ValidationError(_('You are not allowed to create contests for this organization.'))
+        else:
+            if not self.user or not self.user.has_perm('judge.add_contest'):
+                raise ValidationError(_('You do not have permission to create regular contests.'))
+            cleaned_data['organization'] = None
+
+        if selected and any(code not in available_codes for code in selected):
+            raise ValidationError(_('Selected problems must come from the newly uploaded problem list.'))
+        return cleaned_data
+
+
 class ProblemImportPolygonStatementForm(Form):
     polygon_language = forms.CharField()
     site_language = forms.CharField()
