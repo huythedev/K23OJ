@@ -30,7 +30,7 @@
                     {% for category, level in categories_tree %}
                         <tr>
                             <td>
-                                <span style="opacity: 0.65;">{{ '&nbsp;&nbsp;&nbsp;' * level|safe }}</span>
+                                <span style="display: inline-block; width: {{ level * 1.2 }}em;"></span>
                                 {% if level > 0 %}<span style="opacity: 0.6;">↳ </span>{% endif %}
                                 <a href="{{ category.get_absolute_url() }}">{{ category.name }}</a>
                             </td>
