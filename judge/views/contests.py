@@ -68,7 +68,34 @@ class ContestCategoryList(TitleMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['now'] = timezone.now()
+        context['categories_tree'] = self._build_category_tree(context['categories'])
         return context
+
+    @staticmethod
+    def _build_category_tree(categories):
+        categories = list(categories)
+        children_map = defaultdict(list)
+        for category in categories:
+            children_map[category.parent_id].append(category)
+
+        for entries in children_map.values():
+            entries.sort(key=lambda item: item.name.lower())
+
+        ordered = []
+
+        def walk(parent_id, level):
+            for category in children_map.get(parent_id, []):
+                ordered.append((category, level))
+                walk(category.id, level + 1)
+
+        walk(None, 0)
+
+        seen_ids = {category.id for category, _ in ordered}
+        for category in sorted(categories, key=lambda item: item.name.lower()):
+            if category.id not in seen_ids:
+                ordered.append((category, 0))
+
+        return ordered
 
 
 class ContestCategoryCreate(PermissionRequiredMixin, TitleMixin, FormView):
@@ -82,6 +109,15 @@ class ContestCategoryCreate(PermissionRequiredMixin, TitleMixin, FormView):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+
+    def get_initial(self):
+        initial = super().get_initial()
+        parent_slug = self.request.GET.get('parent')
+        if parent_slug:
+            parent = ContestCategory.objects.filter(slug=parent_slug).first()
+            if parent is not None:
+                initial['parent'] = parent
+        return initial
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -112,6 +148,7 @@ class ContestCategoryDetail(TitleMixin, DetailView):
         context['can_edit'] = self.request.user.has_perm('judge.change_contestcategory')
         context['contests'] = Contest.get_visible_contests(self.request.user) \
             .filter(categories=self.object).order_by('-start_time', 'key')
+        context['subcategories'] = self.object.children.order_by('name')
         return context
 
 

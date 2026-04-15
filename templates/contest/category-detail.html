@@ -10,10 +10,31 @@
         <h3 style="margin-bottom: 0.6em;">{{ category.name }}</h3>
 
         {% if category.description %}
-            <div class="form-area" style="margin-bottom: 1.2em; border-left: 4px solid #6aa84f; background: #f8fbf6;">
+            <div class="form-area" style="margin-bottom: 1.2em; border-left: 4px solid #6aa84f;">
                 <div style="font-weight: 600; margin-bottom: 0.5em; color: #355e2b;">{{ _('Description') }}</div>
                 <div style="line-height: 1.6;">{{ category.description|markdown('problem') }}</div>
             </div>
+        {% endif %}
+
+        <h4>{{ _('Subcategories') }}</h4>
+        {% if perms.judge.add_contestcategory %}
+            <p>
+                <a class="button" href="{{ url('contest_category_create') }}?parent={{ category.slug }}">
+                    {{ _('Create subcategory') }}
+                </a>
+            </p>
+        {% endif %}
+        {% if subcategories %}
+            <ul>
+                {% for child in subcategories %}
+                    <li>
+                        <a href="{{ child.get_absolute_url() }}">{{ child.name }}</a>
+                        <span style="opacity: 0.7;">({{ child.slug }})</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>{{ _('No subcategories yet.') }}</p>
         {% endif %}
 
         <h4>{{ _('Contests in this category') }}</h4>

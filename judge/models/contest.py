@@ -69,6 +69,14 @@ class ContestCategory(models.Model):
         validators=[RegexValidator('^[a-z0-9_]+$', _('Category slug must be ^[a-z0-9_]+$'))],
     )
     description = models.TextField(verbose_name=_('description'), blank=True)
+    parent = models.ForeignKey(
+        'self',
+        verbose_name=_('parent category'),
+        null=True,
+        blank=True,
+        on_delete=SET_NULL,
+        related_name='children',
+    )
     contests = models.ManyToManyField('Contest', verbose_name=_('contests'), blank=True, related_name='categories')
     created_by = models.ForeignKey(
         Profile,

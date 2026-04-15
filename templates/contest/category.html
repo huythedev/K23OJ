@@ -15,12 +15,40 @@
         </div>
         <hr>
 
-        {% if categories %}
+        {% if categories_tree is defined and categories_tree %}
             <table class="table striped">
                 <thead>
                     <tr>
                         <th>{{ _('Category') }}</th>
                         <th>{{ _('Slug') }}</th>
+                        <th>{{ _('Parent') }}</th>
+                        <th>{{ _('Contests') }}</th>
+                        <th>{{ _('Updated') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for category, level in categories_tree %}
+                        <tr>
+                            <td>
+                                <span style="opacity: 0.65;">{{ '&nbsp;&nbsp;&nbsp;' * level|safe }}</span>
+                                {% if level > 0 %}<span style="opacity: 0.6;">↳ </span>{% endif %}
+                                <a href="{{ category.get_absolute_url() }}">{{ category.name }}</a>
+                            </td>
+                            <td>{{ category.slug }}</td>
+                            <td>{{ category.parent.name if category.parent else '-' }}</td>
+                            <td>{{ category.contests.count() }}</td>
+                            <td>{{ category.updated_at|date(_('M j, Y, G:i')) }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% elif categories %}
+            <table class="table striped">
+                <thead>
+                    <tr>
+                        <th>{{ _('Category') }}</th>
+                        <th>{{ _('Slug') }}</th>
+                        <th>{{ _('Parent') }}</th>
                         <th>{{ _('Contests') }}</th>
                         <th>{{ _('Updated') }}</th>
                     </tr>
@@ -30,6 +58,7 @@
                         <tr>
                             <td><a href="{{ category.get_absolute_url() }}">{{ category.name }}</a></td>
                             <td>{{ category.slug }}</td>
+                            <td>{{ category.parent.name if category.parent else '-' }}</td>
                             <td>{{ category.contests.count() }}</td>
                             <td>{{ category.updated_at|date(_('M j, Y, G:i')) }}</td>
                         </tr>

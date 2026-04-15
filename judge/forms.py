@@ -955,6 +955,13 @@ class ContestForm(ModelForm):
 
 
 class ContestCategoryForm(ModelForm):
+    parent = forms.ModelChoiceField(
+        queryset=ContestCategory.objects.none(),
+        required=False,
+        label=_('Parent category'),
+        widget=Select2Widget(attrs={'style': 'width: 300px'}),
+    )
+
     contests = forms.ModelMultipleChoiceField(
         queryset=Contest.objects.none(),
         required=False,
@@ -965,6 +972,11 @@ class ContestCategoryForm(ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
+
+        parent_queryset = ContestCategory.objects.order_by('name')
+        if self.instance and self.instance.pk:
+            parent_queryset = parent_queryset.exclude(pk=self.instance.pk)
+        self.fields['parent'].queryset = parent_queryset
 
         queryset = Contest.objects.none()
         if self.user and self.user.is_authenticated:
@@ -1002,9 +1014,22 @@ class ContestCategoryForm(ModelForm):
             self.save_m2m()
         return instance
 
+    def clean_parent(self):
+        parent = self.cleaned_data.get('parent')
+        if not (self.instance and self.instance.pk) or parent is None:
+            return parent
+
+        current_id = self.instance.pk
+        cursor = parent
+        while cursor is not None:
+            if cursor.pk == current_id:
+                raise ValidationError(_('Category parent relationship cannot contain cycles.'))
+            cursor = cursor.parent
+        return parent
+
     class Meta:
         model = ContestCategory
-        fields = ['name', 'slug', 'description', 'contests']
+        fields = ['name', 'slug', 'parent', 'description', 'contests']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 4}),
         }

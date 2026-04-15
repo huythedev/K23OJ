@@ -48,6 +48,95 @@
             const $totalForms = $('#id_contests-TOTAL_FORMS');
             const formTemplate = $('#contest-form-template').html();
 
+            const $uploadForm = $('#autoproblem-upload-form');
+            const $uploadInput = $uploadForm.find('input[type="file"][name="package"]');
+            const $uploadProgressPanel = $('#upload-progress-panel');
+            const $uploadProgressBar = $('#upload-progress-bar');
+            const $uploadProgressText = $('#upload-progress-text');
+            const $uploadSizeText = $('#upload-size-text');
+            const $uploadSpeedText = $('#upload-speed-text');
+            const $uploadSubmit = $uploadForm.find('input[type="submit"]');
+
+            function formatBytes(bytes) {
+                if (!bytes) {
+                    return '0 B';
+                }
+                const units = ['B', 'KB', 'MB', 'GB'];
+                let value = bytes;
+                let unit = 0;
+                while (value >= 1024 && unit < units.length - 1) {
+                    value /= 1024;
+                    unit += 1;
+                }
+                return value.toFixed(unit === 0 ? 0 : 2) + ' ' + units[unit];
+            }
+
+            function resetUploadProgress() {
+                $uploadProgressPanel.hide();
+                $uploadProgressBar.css('width', '0%');
+                $uploadProgressText.text('0%');
+                $uploadSizeText.text('0 B / 0 B');
+                $uploadSpeedText.text('0.00 MB/s');
+            }
+
+            if ($uploadForm.length) {
+                resetUploadProgress();
+
+                $uploadForm.on('submit', function (e) {
+                    const file = $uploadInput[0] && $uploadInput[0].files && $uploadInput[0].files[0];
+                    if (!file) {
+                        return;
+                    }
+
+                    e.preventDefault();
+
+                    const xhr = new XMLHttpRequest();
+                    const formData = new FormData($uploadForm[0]);
+                    const startedAt = Date.now();
+
+                    $uploadSubmit.prop('disabled', true);
+                    $uploadProgressPanel.show();
+
+                    xhr.upload.addEventListener('progress', function (event) {
+                        if (!event.lengthComputable) {
+                            return;
+                        }
+
+                        const loaded = event.loaded;
+                        const total = event.total;
+                        const percent = Math.min(100, Math.floor((loaded / total) * 100));
+                        const elapsedSeconds = Math.max((Date.now() - startedAt) / 1000, 0.001);
+                        const speedMBps = (loaded / elapsedSeconds) / (1024 * 1024);
+
+                        $uploadProgressBar.css('width', percent + '%');
+                        $uploadProgressText.text(percent + '%');
+                        $uploadSizeText.text(formatBytes(loaded) + ' / ' + formatBytes(total));
+                        $uploadSpeedText.text(speedMBps.toFixed(2) + ' MB/s');
+                    });
+
+                    xhr.addEventListener('load', function () {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            document.open();
+                            document.write(xhr.responseText);
+                            document.close();
+                            return;
+                        }
+
+                        alert('Upload failed. Please try again.');
+                        $uploadSubmit.prop('disabled', false);
+                    });
+
+                    xhr.addEventListener('error', function () {
+                        alert('Network error while uploading. Please try again.');
+                        $uploadSubmit.prop('disabled', false);
+                    });
+
+                    xhr.open('POST', $uploadForm.attr('action') || window.location.href, true);
+                    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                    xhr.send(formData);
+                });
+            }
+
             if ($contestForms.length) {
                 $contestForms.find('.contest-form-item').each(function () {
                     bindContestForm($(this));
@@ -72,10 +161,20 @@
 
 {% block body %}
     <input type="hidden" id="contest-org-prefix-map" value="{{ contest_org_prefix_map_json|default('{}')|escape }}">
-    <form action="" method="post" class="form-area centered-form" enctype="multipart/form-data" style="display: flex; justify-content: center; flex-direction: column;">
+    <form id="autoproblem-upload-form" action="" method="post" class="form-area centered-form" enctype="multipart/form-data" style="display: flex; justify-content: center; flex-direction: column;">
         {% csrf_token %}
         <input type="hidden" name="form_action" value="upload">
         <table class="django-as-table">{{ form.as_table() }}</table>
+        <div id="upload-progress-panel" style="display: none; margin-top: 0.8em; border: 1px solid #ddd; border-radius: 6px; padding: 0.7em;">
+            <div style="height: 8px; background: #f1f1f1; border-radius: 4px; overflow: hidden;">
+                <div id="upload-progress-bar" style="height: 100%; width: 0%; background: #4b8b3b;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; gap: 1em; margin-top: 0.5em; font-size: 0.95em;">
+                <div>{{ _('Progress') }}: <b id="upload-progress-text">0%</b></div>
+                <div>{{ _('Uploaded') }}: <b id="upload-size-text">0 B / 0 B</b></div>
+                <div>{{ _('Speed') }}: <b id="upload-speed-text">0.00 MB/s</b></div>
+            </div>
+        </div>
         <hr>
         <div style="display: flex; justify-content: flex-end;"><input type="submit" value="{{ _('Upload') }}" class="button"></div>
     </form>
