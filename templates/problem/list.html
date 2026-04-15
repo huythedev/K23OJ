@@ -25,6 +25,34 @@
         <script src="{{ static('libs/nouislider.min.js') }}" type="text/javascript"></script>
         <script>
             $(function () {
+                {% if request.user.is_authenticated and EVENT_LAST_MSG %}
+                    var currentUserId = {{ request.profile.id }};
+                    event_dispatcher.auto_reconnect = true;
+                    event_dispatcher.on('submissions', function (message) {
+                        if (message.user != currentUserId)
+                            return;
+
+                        if (message.type == 'update-submission') {
+                            var $row = $('#problem-table tbody tr[data-problem-id="' + message.problem + '"]');
+                            if (!$row.length)
+                                return;
+
+                            var $cell = $row.find('td.solved');
+                            if ($cell.attr('solved') != '-1')
+                                return;
+
+                            $cell.attr('solved', '0');
+                            var userSubmissionsUrl = $row.attr('data-user-submissions-url');
+                            var iconClass = $row.attr('data-is-public') == '1' ? 'fa-frown-o' : 'fa-lock';
+                            $cell.html($('<a>', {href: userSubmissionsUrl}).append($('<i>', {
+                                'class': 'attempted-problem-color fa ' + iconClass,
+                            })));
+                        } else if (message.type == 'done-submission') {
+                            window.location.reload();
+                        }
+                    });
+                {% endif %}
+
                 var $form = $('form#filter-form');
                 var $search = $('#search');
                 var $category = $('#category');
@@ -190,7 +218,7 @@
                     <tr>
                         {% if request.user.is_authenticated %}
                             {% if problem.id in completed_problem_ids %}
-                                <td class="solved" solved="1">
+                                <td class="solved" solved="1" data-problem-id="{{ problem.id }}" data-user-submissions-url="{{ url('user_submissions', problem.code, request.user.username) }}" data-is-public="{{ 1 if problem.is_public else 0 }}">
                                     <a href="{{ url('user_submissions', problem.code, request.user.username) }}">
                                         {% if problem.is_public %}
                                             <i class="solved-problem-color fa fa-check-circle"></i>
@@ -200,7 +228,7 @@
                                     </a>
                                 </td>
                             {% elif problem.id in attempted_problems %}
-                                <td class="solved" solved="0">
+                                <td class="solved" solved="0" data-problem-id="{{ problem.id }}" data-user-submissions-url="{{ url('user_submissions', problem.code, request.user.username) }}" data-is-public="{{ 1 if problem.is_public else 0 }}">
                                     <a href="{{ url('user_submissions', problem.code, request.user.username) }}">
                                         {% if problem.is_public %}
                                             <i class="attempted-problem-color fa fa-frown-o"></i>
@@ -210,7 +238,7 @@
                                     </a>
                                 </td>
                             {% else %}
-                                <td class="solved" solved="-1">
+                                <td class="solved" solved="-1" data-problem-id="{{ problem.id }}" data-user-submissions-url="{{ url('user_submissions', problem.code, request.user.username) }}" data-is-public="{{ 1 if problem.is_public else 0 }}">
                                     {% if problem.is_public %}
                                         <i class="unsolved-problem-color fa"></i>
                                     {% else %}

@@ -5,6 +5,30 @@
     {% endif %}
     <style>
         .title-state {
+            {% if request.user.is_authenticated and EVENT_LAST_MSG %}
+                var problemSubmissionUrl = {{ url('user_submissions', problem.code, request.user.username)|htmltojs }};
+                var attemptedIconClass = {{ ('fa-lock' if not (problem.is_public or request.in_contest) else 'fa-frown-o')|htmltojs }};
+
+                event_dispatcher.auto_reconnect = true;
+                event_dispatcher.on('submissions', function (message) {
+                    if (message.user != {{ request.profile.id }} || message.problem != {{ problem.id }})
+                        return;
+
+                    if (message.type == 'update-submission') {
+                        var $title = $('.problem-title');
+                        if (!$title.find('.title-state').length) {
+                            $('<a>', {href: problemSubmissionUrl})
+                                .append($('<i>', {
+                                    'class': 'attempted-problem-color title-state fa ' + attemptedIconClass,
+                                }))
+                                .insertBefore($title.find('h2').first());
+                        }
+                    } else if (message.type == 'done-submission') {
+                        window.location.reload();
+                    }
+                });
+            {% endif %}
+
             font-size: 2em;
             float: left;
             width: 1.1em;

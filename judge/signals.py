@@ -12,7 +12,7 @@ from django.dispatch import receiver
 from registration.models import RegistrationProfile
 from registration.signals import user_registered
 
-from judge.caching import finished_submission
+from judge.caching import contest_submission_started, finished_submission, submission_started
 from judge.models import BlogPost, Comment, Contest, ContestAnnouncement, ContestProblem, ContestSubmission, \
     EFFECTIVE_MATH_ENGINES, Judge, Language, License, MiscConfig, Organization, Problem, Profile, Submission, \
     WebAuthnCredential
@@ -135,6 +135,14 @@ def submission_delete(sender, instance, **kwargs):
     instance.problem.update_stats()
 
 
+@receiver(post_save, sender=Submission)
+def submission_create(sender, instance, created, **kwargs):
+    if not created or hasattr(instance, '_updating_stats_only'):
+        return
+
+    submission_started(instance)
+
+
 @receiver(post_delete, sender=ContestSubmission)
 def contest_submission_delete(sender, instance, **kwargs):
     participation = instance.participation
@@ -169,6 +177,8 @@ def misc_config_delete(sender, instance, **kwargs):
 @receiver(post_save, sender=ContestSubmission)
 def contest_submission_update(sender, instance, **kwargs):
     Submission.objects.filter(id=instance.submission_id).update(contest_object_id=instance.participation.contest_id)
+    if kwargs.get('created'):
+        contest_submission_started(instance.participation)
 
 
 @receiver(post_save, sender=FlatPage)
