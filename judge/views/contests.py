@@ -36,10 +36,10 @@ from reversion import revisions
 
 from judge.comments import CommentedDetailView
 from judge.contest_format import ICPCContestFormat
-from judge.forms import ContestAnnouncementForm, ContestCloneForm, ContestDownloadDataForm, ContestForm, \
-    ProposeContestProblemFormSet
-from judge.models import Contest, ContestAnnouncement, ContestMoss, ContestParticipation, ContestProblem, ContestTag, \
-    Language, Organization, Problem, ProblemClarification, Profile, Submission
+from judge.forms import ContestAnnouncementForm, ContestCategoryForm, ContestCloneForm, ContestDownloadDataForm, \
+    ContestForm, ProposeContestProblemFormSet
+from judge.models import Contest, ContestAnnouncement, ContestCategory, ContestMoss, ContestParticipation, \
+    ContestProblem, ContestTag, Language, Organization, Problem, ProblemClarification, Profile, Submission
 from judge.tasks import on_new_contest, prepare_contest_data, run_moss
 from judge.utils.celery import redirect_to_task_status, task_status_by_id, task_status_url_by_id
 from judge.utils.cms import parse_csv_ranking
@@ -54,6 +54,98 @@ __all__ = ['ContestList', 'ContestDetail', 'ContestRanking', 'ContestJoin', 'Con
            'ContestClone', 'ContestStats', 'ContestMossView', 'ContestMossDelete',
            'ContestParticipationList', 'ContestParticipationDisqualify', 'get_contest_ranking_list',
            'base_contest_ranking_list']
+
+
+class ContestCategoryList(TitleMixin, ListView):
+    title = gettext_lazy('Contest categories')
+    template_name = 'contest/category.html'
+    model = ContestCategory
+    context_object_name = 'categories'
+
+    def get_queryset(self):
+        return ContestCategory.objects.all().prefetch_related('contests')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['now'] = timezone.now()
+        return context
+
+
+class ContestCategoryCreate(PermissionRequiredMixin, TitleMixin, FormView):
+    title = gettext_lazy('Create contest category')
+    template_name = 'contest/category-create.html'
+    form_class = ContestCategoryForm
+    permission_required = 'judge.add_contestcategory'
+    permission_denied_message = _('You are not allowed to create contest categories.')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['now'] = timezone.now()
+        return context
+
+    def form_valid(self, form):
+        category = form.save(commit=False)
+        category.created_by = self.request.profile
+        category.save()
+        form.save_m2m()
+        return HttpResponseRedirect(category.get_absolute_url())
+
+
+class ContestCategoryDetail(TitleMixin, DetailView):
+    model = ContestCategory
+    slug_field = 'slug'
+    slug_url_kwarg = 'slug'
+    template_name = 'contest/category-detail.html'
+
+    def get_title(self):
+        return _('Contest category: %(name)s') % {'name': self.object.name}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['now'] = timezone.now()
+        context['category'] = self.object
+        context['can_edit'] = self.request.user.has_perm('judge.change_contestcategory')
+        context['contests'] = Contest.get_visible_contests(self.request.user) \
+            .filter(categories=self.object).order_by('-start_time', 'key')
+        return context
+
+
+class ContestCategoryEdit(PermissionRequiredMixin, TitleMixin, SingleObjectMixin, FormView):
+    model = ContestCategory
+    slug_field = 'slug'
+    slug_url_kwarg = 'slug'
+    template_name = 'contest/category-edit.html'
+    form_class = ContestCategoryForm
+    permission_required = 'judge.change_contestcategory'
+    permission_denied_message = _('You are not allowed to edit this category.')
+
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_title(self):
+        return _('Edit contest category: %(name)s') % {'name': self.object.name}
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['instance'] = self.object
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['now'] = timezone.now()
+        context['category'] = self.object
+        return context
+
+    def form_valid(self, form):
+        form.save()
+        return HttpResponseRedirect(self.object.get_absolute_url())
 
 
 def _find_contest(request, key, private_check=True):

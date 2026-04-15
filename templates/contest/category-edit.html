@@ -1,0 +1,31 @@
+{% extends "common-content.html" %}
+
+{% block content_media %}
+    {{ form.media.css }}
+{% endblock %}
+
+{% block content_js_media %}
+    {{ form.media.js }}
+{% endblock %}
+
+{% block title_row %}
+    {% set tab = 'category' %}
+    {% include "contest/contest-list-tabs.html" %}
+{% endblock %}
+
+{% block body %}
+    <div class="content-description">
+        <h4>{{ _('Edit contest category') }}</h4>
+        <p>
+            <a href="{{ category.get_absolute_url() }}">&larr; {{ _('Back to category') }}</a>
+        </p>
+
+        <form action="" method="post" class="form-area centered-form">
+            {% csrf_token %}
+            <table class="django-as-table">{{ form.as_table() }}</table>
+            <div style="display: flex; justify-content: flex-end; margin-top: 0.8em;">
+                <input type="submit" class="button" value="{{ _('Save') }}">
+            </div>
+        </form>
+    </div>
+{% endblock %}

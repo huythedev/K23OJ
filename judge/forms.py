@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import zipfile
 from operator import attrgetter, itemgetter
 
@@ -20,7 +21,7 @@ from django.urls import reverse, reverse_lazy
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _, ngettext_lazy
 
-from judge.models import BlogPost, Contest, ContestAnnouncement, ContestProblem, Language, LanguageLimit, \
+from judge.models import BlogPost, Contest, ContestAnnouncement, ContestCategory, ContestProblem, Language, LanguageLimit, \
     Organization, Problem, Profile, Solution, Submission, Tag, WebAuthnCredential
 from judge.utils.subscription import newsletter_id
 from judge.widgets import AceWidget, HeavySelect2MultipleWidget, HeavySelect2Widget, MartorWidget, \
@@ -950,6 +951,62 @@ class ContestForm(ModelForm):
             'key': {
                 'invalid': _('Only accept alphanumeric characters (a-z, 0-9) and underscore (_)'),
             },
+        }
+
+
+class ContestCategoryForm(ModelForm):
+    contests = forms.ModelMultipleChoiceField(
+        queryset=Contest.objects.none(),
+        required=False,
+        label=_('Contests'),
+        widget=HeavySelect2MultipleWidget(data_view='contest_select2', attrs={'style': 'width: 100%'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        queryset = Contest.objects.none()
+        if self.user and self.user.is_authenticated:
+            if self.user.has_perm('judge.edit_all_contest'):
+                queryset = Contest.objects.order_by('-start_time', 'key')
+            elif self.user.has_perm('judge.edit_own_contest'):
+                queryset = Contest.objects.filter(
+                    Q(authors=self.user.profile) | Q(curators=self.user.profile),
+                ).distinct().order_by('-start_time', 'key')
+            elif self.user.has_perm('judge.add_contestcategory') or self.user.has_perm('judge.change_contestcategory'):
+                queryset = Contest.get_visible_contests(self.user).order_by('-start_time', 'key')
+
+        self.fields['contests'].queryset = queryset
+
+    @staticmethod
+    def _slugify_category_name(name):
+        slug = re.sub(r'[^a-z0-9_]+', '_', name.strip().lower())
+        slug = re.sub(r'_+', '_', slug).strip('_')
+        return slug or 'category'
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+
+        if not instance.slug:
+            base_slug = self._slugify_category_name(instance.name)
+            candidate = base_slug
+            suffix = 2
+            while ContestCategory.objects.filter(slug=candidate).exists():
+                candidate = '%s_%d' % (base_slug, suffix)
+                suffix += 1
+            instance.slug = candidate
+
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+    class Meta:
+        model = ContestCategory
+        fields = ['name', 'slug', 'description', 'contests']
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 4}),
         }
 
 

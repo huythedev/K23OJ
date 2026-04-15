@@ -1,0 +1,31 @@
+{% extends "common-content.html" %}
+
+{% block content_media %}
+    {{ form.media.css }}
+{% endblock %}
+
+{% block content_js_media %}
+    {{ form.media.js }}
+{% endblock %}
+
+{% block title_row %}
+    {% set tab = 'category' %}
+    {% include "contest/contest-list-tabs.html" %}
+{% endblock %}
+
+{% block body %}
+    <div class="content-description">
+        <h4>{{ _('Create contest category') }}</h4>
+        <p>
+            <a href="{{ url('contest_category_list_create') }}">&larr; {{ _('Back to categories') }}</a>
+        </p>
+
+        <form action="" method="post" class="form-area centered-form">
+            {% csrf_token %}
+            <table class="django-as-table">{{ form.as_table() }}</table>
+            <div style="display: flex; justify-content: flex-end; margin-top: 0.8em;">
+                <input type="submit" class="button" value="{{ _('Create category') }}">
+            </div>
+        </form>
+    </div>
+{% endblock %}

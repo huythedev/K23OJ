@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
-from django.db.models import CASCADE, Q
+from django.db.models import CASCADE, Q, SET_NULL
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -22,8 +22,8 @@ from judge.models.submission import Submission
 from judge.ratings import rate_contest
 from judge.utils.unicode import utf8bytes
 
-__all__ = ['Contest', 'ContestTag', 'ContestAnnouncement', 'ContestParticipation', 'ContestProblem',
-           'ContestSubmission', 'Rating']
+__all__ = ['ContestCategory', 'Contest', 'ContestTag', 'ContestAnnouncement', 'ContestParticipation',
+           'ContestProblem', 'ContestSubmission', 'Rating']
 
 
 class MinValueOrNoneValidator(MinValueValidator):
@@ -58,6 +58,39 @@ class ContestTag(models.Model):
     class Meta:
         verbose_name = _('contest tag')
         verbose_name_plural = _('contest tags')
+
+
+class ContestCategory(models.Model):
+    name = models.CharField(max_length=100, verbose_name=_('category name'))
+    slug = models.SlugField(
+        max_length=64,
+        unique=True,
+        verbose_name=_('category slug'),
+        validators=[RegexValidator('^[a-z0-9_]+$', _('Category slug must be ^[a-z0-9_]+$'))],
+    )
+    description = models.TextField(verbose_name=_('description'), blank=True)
+    contests = models.ManyToManyField('Contest', verbose_name=_('contests'), blank=True, related_name='categories')
+    created_by = models.ForeignKey(
+        Profile,
+        verbose_name=_('created by'),
+        null=True,
+        blank=True,
+        on_delete=SET_NULL,
+        related_name='created_contest_categories',
+    )
+    created_at = models.DateTimeField(verbose_name=_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(verbose_name=_('updated at'), auto_now=True)
+
+    class Meta:
+        ordering = ('name',)
+        verbose_name = _('contest category')
+        verbose_name_plural = _('contest categories')
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('contest_category_detail', args=[self.slug])
 
 
 class Contest(models.Model):

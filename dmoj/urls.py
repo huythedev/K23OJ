@@ -234,6 +234,12 @@ urlpatterns = [
     path('contests.ics', contests.ContestICal.as_view(), name='contest_ical'),
     path('contests/<int:year>/<int:month>/', contests.ContestCalendar.as_view(), name='contest_calendar'),
     path('contests/new', contests.CreateContest.as_view(), name='contest_new'),
+    path('category', include([
+        path('', contests.ContestCategoryList.as_view(), name='contest_category_list_create'),
+        path('/create', contests.ContestCategoryCreate.as_view(), name='contest_category_create'),
+        path('/<slug:slug>/edit', contests.ContestCategoryEdit.as_view(), name='contest_category_edit'),
+        path('/<slug:slug>', contests.ContestCategoryDetail.as_view(), name='contest_category_detail'),
+    ])),
     re_path(r'^contests/tag/(?P<name>[a-z-]+)', include([
         path('', contests.ContestTagDetail.as_view(), name='contest_tag'),
         path('/ajax', contests.ContestTagDetailAjax.as_view(), name='contest_tag_ajax'),
