@@ -136,7 +136,7 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         (_('Justice'), {'fields': ('banned_users',)}),
         (_('History'), {'fields': ('change_message',)}),
     )
-    list_display = ['code', 'name', 'show_authors', 'points', 'is_public', 'show_public']
+    list_display = ['code', 'name', 'upload_date', 'show_authors', 'points', 'is_public', 'show_public']
     ordering = ['code']
     search_fields = ('code', 'name', 'authors__user__username', 'curators__user__username')
     inlines = [LanguageLimitInline, ProblemClarificationInline, ProblemSolutionInline, ProblemTranslationInline]
@@ -174,6 +174,10 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
     @admin.display(description=_('authors'))
     def show_authors(self, obj):
         return ', '.join(map(attrgetter('user.username'), obj.authors.all()))
+
+    @admin.display(ordering='date', description=_('upload date'))
+    def upload_date(self, obj):
+        return obj.date
 
     @admin.display(description='')
     def show_public(self, obj):
