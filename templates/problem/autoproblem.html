@@ -122,6 +122,13 @@
                             return;
                         }
 
+                        if (xhr.responseText) {
+                            document.open();
+                            document.write(xhr.responseText);
+                            document.close();
+                            return;
+                        }
+
                         alert('Upload failed. Please try again.');
                         $uploadSubmit.prop('disabled', false);
                     });

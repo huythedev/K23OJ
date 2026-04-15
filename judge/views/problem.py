@@ -1,7 +1,9 @@
 import json
 import logging
 import os
+import posixpath
 import re
+import shutil
 import tempfile
 import zipfile
 from datetime import timedelta
@@ -1122,6 +1124,22 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
         return [int(part) if part.isdigit() else part for part in parts]
 
     @staticmethod
+    def _normalize_archive_member_name(member_name):
+        normalized = member_name.replace('\\', '/')
+        normalized = posixpath.normpath(normalized)
+        if normalized in ('', '.'):
+            return None
+        if normalized.startswith('../') or normalized == '..' or normalized.startswith('/'):
+            raise ValueError('Archive contains unsafe paths')
+        return normalized
+
+    @staticmethod
+    def _join_archive_path(parent, child):
+        if not parent:
+            return child
+        return posixpath.join(parent, child)
+
+    @staticmethod
     def _filter_valid_archive_files(file_list):
         return [
             file_name for file_name in file_list
@@ -1476,23 +1494,26 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
 
         try:
             with zipfile.ZipFile(package.file) as archive:
-                with tempfile.TemporaryDirectory(prefix='autoproblem_') as extract_dir:
-                    self._safe_extract_archive(archive, extract_dir)
+                member_name_map = {}
+                for member in archive.namelist():
+                    normalized_name = self._normalize_archive_member_name(member)
+                    if not normalized_name or member.endswith('/'):
+                        continue
+                    member_name_map[normalized_name] = member
 
-                    markdown_paths = []
-                    for root, _dirs, files in os.walk(extract_dir):
-                        for file_name in files:
-                            if file_name.lower().endswith('.md'):
-                                markdown_paths.append(os.path.join(root, file_name))
+                valid_member_names = set(self._filter_valid_archive_files(list(member_name_map.keys())))
+                markdown_paths = sorted(
+                    [name for name in valid_member_names if name.lower().endswith('.md')],
+                    key=self._natural_sort_key,
+                )
 
-                    markdown_paths.sort(key=lambda path: os.path.relpath(path, extract_dir))
-
-                    seen_codes = set()
-                    allowed_languages = Language.objects.filter(include_in_problem=True)
-                    for markdown_path in markdown_paths:
-                        markdown_filename = os.path.basename(markdown_path)
+                seen_codes = set()
+                allowed_languages = Language.objects.filter(include_in_problem=True)
+                for markdown_path in markdown_paths:
+                        markdown_filename = posixpath.basename(markdown_path)
                         sanitized_code = self._sanitize_problem_code(markdown_filename)
                         problem_code = self.build_problem_code(sanitized_code)
+                        markdown_dir = posixpath.dirname(markdown_path)
 
                         if not problem_code:
                             reason = _('Filename produced an empty problem code after sanitization.')
@@ -1524,17 +1545,17 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                         checker_path = None
                         checker_filename = None
                         for candidate_checker in self.get_checker_candidates(sanitized_code, problem_code):
-                            candidate_path = os.path.join(os.path.dirname(markdown_path), candidate_checker)
-                            if os.path.isfile(candidate_path):
+                            candidate_path = self._join_archive_path(markdown_dir, candidate_checker)
+                            if candidate_path in valid_member_names:
                                 checker_path = candidate_path
-                                checker_filename = os.path.basename(candidate_path)
+                                checker_filename = posixpath.basename(candidate_path)
                                 break
 
                         testcase_archive = None
                         testcase_path = None
                         for candidate_archive in self.get_testcase_archive_candidates(sanitized_code, problem_code):
-                            candidate_path = os.path.join(os.path.dirname(markdown_path), candidate_archive)
-                            if os.path.isfile(candidate_path):
+                            candidate_path = self._join_archive_path(markdown_dir, candidate_archive)
+                            if candidate_path in valid_member_names:
                                 testcase_archive = candidate_archive
                                 testcase_path = candidate_path
                                 break
@@ -1552,115 +1573,120 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                             )
                             continue
 
-                        try:
-                            with zipfile.ZipFile(testcase_path, 'r') as testcase_zip:
-                                valid_files = self._filter_valid_archive_files(testcase_zip.namelist())
-                        except zipfile.BadZipFile:
-                            reason = _('Invalid testcase archive %(archive)s.') % {
-                                'archive': testcase_archive,
-                            }
-                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
-                            autoproblem_logger.warning(
-                                'Skipping markdown file %s: invalid testcase archive %s',
-                                markdown_filename,
-                                testcase_archive,
-                            )
-                            continue
+                        with tempfile.NamedTemporaryFile(prefix='autoproblem_case_', suffix='.zip') as testcase_tmp:
+                            with archive.open(member_name_map[testcase_path], 'r') as testcase_stream, open(testcase_tmp.name, 'wb') as testcase_out:
+                                shutil.copyfileobj(testcase_stream, testcase_out, length=1024 * 1024)
 
-                        testcase_pairs = self._detect_testcase_pairs(valid_files)
-                        if not testcase_pairs:
-                            reason = _('Could not detect matching input/output testcase pairs in %(archive)s.') % {
-                                'archive': testcase_archive,
-                            }
-                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
-                            autoproblem_logger.warning(
-                                'Skipping markdown file %s: no recognizable testcase pairs in %s',
-                                markdown_filename,
-                                testcase_archive,
-                            )
-                            continue
-
-                        with open(markdown_path, 'r', encoding='utf-8-sig', errors='replace') as statement_file:
-                            markdown_content = statement_file.read()
-                        problem_name, problem_statement = self._parse_markdown_statement(markdown_content, problem_code)
-
-                        with transaction.atomic():
-                            with revisions.create_revision(atomic=True):
-                                problem = Problem.objects.create(
-                                    code=problem_code,
-                                    name=problem_name,
-                                    description=problem_statement,
-                                    time_limit=1,
-                                    memory_limit=262144,
-                                    points=1,
-                                    partial=True,
-                                    group=default_group,
-                                    submission_source_visibility_mode=SubmissionSourceAccess.FOLLOW,
-                                    testcase_visibility_mode=ProblemTestcaseAccess.AUTHOR_ONLY,
-                                    date=timezone.now(),
+                            try:
+                                with zipfile.ZipFile(testcase_tmp.name, 'r') as testcase_zip:
+                                    valid_files = self._filter_valid_archive_files(testcase_zip.namelist())
+                            except zipfile.BadZipFile:
+                                reason = _('Invalid testcase archive %(archive)s.') % {
+                                    'archive': testcase_archive,
+                                }
+                                report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                                autoproblem_logger.warning(
+                                    'Skipping markdown file %s: invalid testcase archive %s',
+                                    markdown_filename,
+                                    testcase_archive,
                                 )
-                                self.assign_problem_ownership(problem)
-                                problem.types.add(default_type)
-                                problem.allowed_languages.set(allowed_languages)
+                                continue
 
-                                problem_data = ProblemData.objects.create(problem=problem)
-                                with open(testcase_path, 'rb') as testcase_file:
-                                    testcase_basename = os.path.basename(testcase_path)
-                                    problem_data.zipfile.save(testcase_basename, File(testcase_file), save=True)
+                            testcase_pairs = self._detect_testcase_pairs(valid_files)
+                            if not testcase_pairs:
+                                reason = _('Could not detect matching input/output testcase pairs in %(archive)s.') % {
+                                    'archive': testcase_archive,
+                                }
+                                report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                                autoproblem_logger.warning(
+                                    'Skipping markdown file %s: no recognizable testcase pairs in %s',
+                                    markdown_filename,
+                                    testcase_archive,
+                                )
+                                continue
 
-                                checker_language = self._detect_checker_language(checker_filename) if checker_filename else None
-                                if checker_path and checker_language:
-                                    with open(checker_path, 'rb') as checker_file:
-                                        problem_data.custom_checker.save(checker_filename, File(checker_file), save=False)
-                                    problem_data.checker = 'bridged'
-                                    problem_data.checker_args = json.dumps({
-                                        'files': checker_filename,
-                                        'lang': checker_language,
-                                        'type': 'default',
-                                    })
-                                    problem_data.save(update_fields=('custom_checker', 'checker', 'checker_args'))
+                            with archive.open(member_name_map[markdown_path], 'r') as statement_file:
+                                markdown_content = statement_file.read().decode('utf-8-sig', errors='replace')
+                            problem_name, problem_statement = self._parse_markdown_statement(markdown_content, problem_code)
 
-
-
-                                cases = [
-                                    ProblemTestCase(
-                                        dataset=problem,
-                                        order=index,
-                                        type='C',
-                                        input_file=input_file,
-                                        output_file=output_file,
+                            with transaction.atomic():
+                                with revisions.create_revision(atomic=True):
+                                    problem = Problem.objects.create(
+                                        code=problem_code,
+                                        name=problem_name,
+                                        description=problem_statement,
+                                        time_limit=1,
+                                        memory_limit=262144,
                                         points=1,
-                                        is_pretest=False,
-                                        is_sample=False,
+                                        partial=True,
+                                        group=default_group,
+                                        submission_source_visibility_mode=SubmissionSourceAccess.FOLLOW,
+                                        testcase_visibility_mode=ProblemTestcaseAccess.AUTHOR_ONLY,
+                                        date=timezone.now(),
                                     )
-                                    for index, (input_file, output_file) in enumerate(testcase_pairs, start=1)
-                                ]
-                                ProblemTestCase.objects.bulk_create(cases)
+                                    self.assign_problem_ownership(problem)
+                                    problem.types.add(default_type)
+                                    problem.allowed_languages.set(allowed_languages)
 
-                                # Fetch and save each testcase to trigger model save logic (like Apply button)
-                                for testcase in ProblemTestCase.objects.filter(dataset=problem):
-                                    # Ensure all required fields are set (add more if needed)
-                                    if testcase.points is None:
-                                        testcase.points = 1
-                                    if testcase.is_pretest is None:
-                                        testcase.is_pretest = False
-                                    if testcase.is_sample is None:
-                                        testcase.is_sample = False
-                                    testcase.save()
+                                    problem_data = ProblemData.objects.create(problem=problem)
+                                    with open(testcase_tmp.name, 'rb') as testcase_file:
+                                        testcase_basename = posixpath.basename(testcase_path)
+                                        problem_data.zipfile.save(testcase_basename, File(testcase_file), save=True)
 
-                                ProblemDataCompiler.generate(problem, problem_data, problem.cases.order_by('order'), valid_files)
+                                    checker_language = self._detect_checker_language(checker_filename) if checker_filename else None
+                                    if checker_path and checker_language:
+                                        with tempfile.NamedTemporaryFile(prefix='autoproblem_checker_') as checker_tmp:
+                                            with archive.open(member_name_map[checker_path], 'r') as checker_stream, open(checker_tmp.name, 'wb') as checker_out:
+                                                shutil.copyfileobj(checker_stream, checker_out, length=1024 * 1024)
+                                            with open(checker_tmp.name, 'rb') as checker_file:
+                                                problem_data.custom_checker.save(checker_filename, File(checker_file), save=False)
+                                        problem_data.checker = 'bridged'
+                                        problem_data.checker_args = json.dumps({
+                                            'files': checker_filename,
+                                            'lang': checker_language,
+                                            'type': 'default',
+                                        })
+                                        problem_data.save(update_fields=('custom_checker', 'checker', 'checker_args'))
 
-                                revisions.set_comment(_('Bulk-created from /autoproblem upload'))
-                                revisions.set_user(self.request.user)
+                                    cases = [
+                                        ProblemTestCase(
+                                            dataset=problem,
+                                            order=index,
+                                            type='C',
+                                            input_file=input_file,
+                                            output_file=output_file,
+                                            points=1,
+                                            is_pretest=False,
+                                            is_sample=False,
+                                        )
+                                        for index, (input_file, output_file) in enumerate(testcase_pairs, start=1)
+                                    ]
+                                    ProblemTestCase.objects.bulk_create(cases)
 
-                            self.post_problem_created(problem)
+                                    # Fetch and save each testcase to trigger model save logic (like Apply button)
+                                    for testcase in ProblemTestCase.objects.filter(dataset=problem):
+                                        # Ensure all required fields are set (add more if needed)
+                                        if testcase.points is None:
+                                            testcase.points = 1
+                                        if testcase.is_pretest is None:
+                                            testcase.is_pretest = False
+                                        if testcase.is_sample is None:
+                                            testcase.is_sample = False
+                                        testcase.save()
 
-                        report['created'].append({
-                            'file': markdown_filename,
-                            'code': problem_code,
-                            'name': problem_name,
-                            'url': reverse('problem_detail', args=[problem_code]),
-                        })
+                                    ProblemDataCompiler.generate(problem, problem_data, problem.cases.order_by('order'), valid_files)
+
+                                    revisions.set_comment(_('Bulk-created from /autoproblem upload'))
+                                    revisions.set_user(self.request.user)
+
+                                self.post_problem_created(problem)
+
+                            report['created'].append({
+                                'file': markdown_filename,
+                                'code': problem_code,
+                                'name': problem_name,
+                                'url': reverse('problem_detail', args=[problem_code]),
+                            })
 
         except (zipfile.BadZipFile, OSError, ValueError) as e:
             return generic_message(self.request, _('Invalid upload package'), str(e), status=400)
