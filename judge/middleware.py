@@ -1,7 +1,10 @@
 import base64
 import hmac
+import os
 import re
+import shutil
 import struct
+import tempfile
 from urllib.parse import quote
 
 from django.conf import settings
@@ -183,6 +186,60 @@ class APIMiddleware(object):
             response['WWW-Authenticate'] = 'Bearer realm="API"'
             response.status_code = 401
             return response
+        return self.get_response(request)
+
+
+class AutoProblemUploadGuardMiddleware:
+    # Keep enough free space because request bodies may be buffered by reverse proxy and Django upload handlers.
+    default_disk_multiplier = 1.15
+    default_reserve_bytes = 1024 * 1024 * 1024
+
+    @staticmethod
+    def _format_bytes(num_bytes):
+        units = ('B', 'KB', 'MB', 'GB', 'TB')
+        value = float(max(num_bytes, 0))
+        for unit in units:
+            if value < 1024 or unit == units[-1]:
+                return '%.2f %s' % (value, unit)
+            value /= 1024.0
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.method == 'POST' and request.path_info.rstrip('/') == '/autoproblem':
+            content_length = request.META.get('CONTENT_LENGTH')
+            if content_length:
+                try:
+                    upload_size = int(content_length)
+                except (TypeError, ValueError):
+                    upload_size = 0
+
+                if upload_size > 0:
+                    upload_temp_dir = getattr(settings, 'FILE_UPLOAD_TEMP_DIR', None) or tempfile.gettempdir()
+                    disk_multiplier = float(getattr(settings, 'AUTOPROBLEM_UPLOAD_DISK_MULTIPLIER', self.default_disk_multiplier))
+                    reserve_bytes = int(getattr(settings, 'AUTOPROBLEM_UPLOAD_DISK_RESERVE_BYTES', self.default_reserve_bytes))
+                    required_bytes = int(upload_size * disk_multiplier) + reserve_bytes
+
+                    try:
+                        os.makedirs(upload_temp_dir, exist_ok=True)
+                        free_bytes = shutil.disk_usage(upload_temp_dir).free
+                    except OSError:
+                        free_bytes = 0
+
+                    if free_bytes < required_bytes:
+                        return HttpResponse(
+                            'Insufficient temporary disk space for this upload. '
+                            'Required: %s, available: %s in %s. '
+                            'Please free up space or lower package size.' % (
+                                self._format_bytes(required_bytes),
+                                self._format_bytes(free_bytes),
+                                upload_temp_dir,
+                            ),
+                            status=507,
+                            content_type='text/plain',
+                        )
+
         return self.get_response(request)
 
 

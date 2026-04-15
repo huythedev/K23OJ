@@ -17,7 +17,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.files import File
 from django.db import transaction
-from django.db.models import BooleanField, Case, F, Prefetch, Q, When
+from django.db.models import BooleanField, Case, F, Max, Prefetch, Q, When
 from django.db.utils import ProgrammingError
 from django.http import Http404, HttpResponse, HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -36,7 +36,7 @@ from reversion import revisions
 from judge.comments import CommentedDetailView
 from judge.forms import LanguageLimitFormSet, ProblemCloneForm, ProblemEditForm, ProblemEditTypeGroupForm, \
     ProblemImportPolygonForm, ProblemImportPolygonStatementFormSet, ProblemSubmitForm, ProposeProblemSolutionFormSet, \
-    ProblemAutoProblemForm, AutoProblemContestCreateFormSet
+    ProblemAutoProblemForm, AutoProblemContestCreateFormSet, AutoProblemAddToExistingContestForm
 from judge.models import Contest, ContestProblem, ContestSubmission, Judge, Language, Organization, Problem, ProblemGroup, ProblemTestCase, \
     ProblemTranslation, ProblemType, RuntimeVersion, Solution, Submission, SubmissionSource, SubmissionSourceAccess, \
     ProblemData, problem_data_storage
@@ -1307,8 +1307,27 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
             kwargs['data'] = data
         return AutoProblemContestCreateFormSet(**kwargs)
 
+    def _get_add_existing_contest_form(self, created_items, data=None):
+        kwargs = {
+            'user': self.request.user,
+            'problem_choices': self._build_contest_problem_choices(created_items),
+        }
+        if data is not None:
+            return AutoProblemAddToExistingContestForm(data=data, **kwargs)
+        return AutoProblemAddToExistingContestForm(**kwargs)
+
+    def _can_edit_contest_for_autoproblem(self, contest):
+        user = self.request.user
+        if user.has_perm('judge.change_contest') or user.has_perm('judge.edit_all_contest'):
+            return True
+        if contest.is_editable_by(user):
+            return True
+        if contest.is_organization_private and contest.organizations.filter(admins=user.profile).exists():
+            return True
+        return False
+
     def _build_contest_org_prefix_map(self, contest_formset):
-        if not contest_formset.forms:
+        if contest_formset is None or not contest_formset.forms:
             return {}
         contest_form = contest_formset.forms[0]
         return {
@@ -1390,41 +1409,42 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
         order_map = {code: index for index, code in enumerate(selected_codes, start=1)}
         now = timezone.now()
 
-        with revisions.create_revision(atomic=True):
-            contest = Contest.objects.create(
-                key=contest_form.cleaned_data['contest_id'],
-                name=contest_form.cleaned_data['contest_name'],
-                start_time=now,
-                end_time=now + timedelta(minutes=10),
-                is_visible=False,
-                use_clarifications=True,
-                hide_problem_tags=False,
-                hide_problem_authors=False,
-                show_short_display=False,
-                scoreboard_visibility=Contest.SCOREBOARD_VISIBLE,
-                format_name='default',
-            )
-            contest.authors.add(self.request.profile)
-
-            if is_organization:
-                contest.is_organization_private = True
-                contest.save(update_fields=('is_organization_private',))
-                contest.organizations.add(organization)
-
-            contest_problems = [
-                ContestProblem(
-                    contest=contest,
-                    problem=problem,
-                    points=1,
-                    order=order_map[problem.code],
-                    partial=True,
+        with transaction.atomic():
+            with revisions.create_revision(atomic=False):
+                contest = Contest.objects.create(
+                    key=contest_form.cleaned_data['contest_id'],
+                    name=contest_form.cleaned_data['contest_name'],
+                    start_time=now,
+                    end_time=now + timedelta(minutes=10),
+                    is_visible=False,
+                    use_clarifications=True,
+                    hide_problem_tags=False,
+                    hide_problem_authors=False,
+                    show_short_display=False,
+                    scoreboard_visibility=Contest.SCOREBOARD_VISIBLE,
+                    format_name='default',
                 )
-                for problem in selected_problems
-            ]
-            ContestProblem.objects.bulk_create(contest_problems)
+                contest.authors.add(self.request.profile)
 
-            revisions.set_comment(_('Created contest from /autoproblem upload'))
-            revisions.set_user(self.request.user)
+                if is_organization:
+                    contest.is_organization_private = True
+                    contest.save(update_fields=('is_organization_private',))
+                    contest.organizations.add(organization)
+
+                contest_problems = [
+                    ContestProblem(
+                        contest=contest,
+                        problem=problem,
+                        points=1,
+                        order=order_map[problem.code],
+                        partial=True,
+                    )
+                    for problem in selected_problems
+                ]
+                ContestProblem.objects.bulk_create(contest_problems)
+
+                revisions.set_comment(_('Created contest from /autoproblem upload'))
+                revisions.set_user(self.request.user)
 
         try:
             on_new_contest.delay(contest.key)
@@ -1440,6 +1460,7 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
         created_contest_keys = self._parse_created_contest_keys(request.POST.get('created_contest_keys', ''))
 
         contest_formset = self._get_contest_formset(created_items, data=request.POST)
+        add_existing_form = self._get_add_existing_contest_form(created_items)
         contests_created_in_submit = 0
         contest_create_error = None
 
@@ -1469,23 +1490,136 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
         return self.render_to_response(self.get_context_data(
             report=report,
             contest_formset=contest_formset,
+            add_existing_contest_form=add_existing_form,
             contest_org_prefix_map_json=contest_org_prefix_map_json,
             contest_created_success=contests_created_in_submit > 0,
             contests_created_in_submit=contests_created_in_submit,
             contest_create_error=contest_create_error,
+            add_existing_success=False,
+            add_existing_added_count=0,
+            add_existing_skipped_count=0,
+            add_existing_error=None,
+            add_existing_contest=None,
             created_contests=self._build_created_contests(created_contest_keys),
             created_contest_keys=self._serialize_created_contest_keys(created_contest_keys),
             available_problem_codes_csv=available_problem_codes_csv,
+            contest_action_mode='create_new',
+        ))
+
+    def _handle_add_to_existing_contest_post(self, request, *args, **kwargs):
+        available_codes_raw = request.POST.get('available_problem_codes', '')
+        available_codes = [code.strip() for code in available_codes_raw.split(',') if code.strip()]
+        created_items = self._build_report_created_from_codes(available_codes)
+        available_problem_codes_csv = ','.join(item['code'] for item in created_items)
+        created_contest_keys = self._parse_created_contest_keys(request.POST.get('created_contest_keys', ''))
+
+        can_create_contest = self._can_create_regular_contest() or self._can_create_any_organization_contest()
+        contest_formset = self._get_contest_formset(created_items) if can_create_contest else None
+        add_existing_form = self._get_add_existing_contest_form(created_items, data=request.POST)
+        add_existing_success = False
+        add_existing_added_count = 0
+        add_existing_skipped_count = 0
+        add_existing_error = None
+        add_existing_contest = None
+
+        if add_existing_form.is_valid():
+            contest = add_existing_form.cleaned_data['existing_contest']
+            if not self._can_edit_contest_for_autoproblem(contest):
+                add_existing_form.add_error('existing_contest', _('You do not have permission to edit this contest.'))
+                add_existing_error = _('Invalid contest selection.')
+            else:
+                selected_codes = add_existing_form.cleaned_data['selected_problems']
+                selected_problems = list(Problem.objects.filter(code__in=selected_codes))
+                selected_problems_by_code = {problem.code: problem for problem in selected_problems}
+                if len(selected_problems_by_code) != len(set(selected_codes)):
+                    add_existing_form.add_error('selected_problems', _('One or more selected problems were not found.'))
+                    add_existing_error = _('Some selected problems are invalid.')
+                else:
+                    for problem in selected_problems:
+                        if not problem.is_editable_by(self.request.user):
+                            add_existing_form.add_error(
+                                'selected_problems',
+                                _('One or more selected problems are not editable by you.'),
+                            )
+                            add_existing_error = _('Some selected problems are not editable by you.')
+                            break
+
+                if add_existing_error is None:
+                    existing_problem_ids = set(
+                        ContestProblem.objects.filter(contest=contest).values_list('problem_id', flat=True)
+                    )
+                    max_order = ContestProblem.objects.filter(contest=contest).aggregate(Max('order'))['order__max'] or 0
+                    next_order = max_order
+                    contest_problems_to_create = []
+
+                    for code in selected_codes:
+                        problem = selected_problems_by_code.get(code)
+                        if problem is None:
+                            continue
+                        if problem.id in existing_problem_ids:
+                            add_existing_skipped_count += 1
+                            continue
+
+                        next_order += 1
+                        contest_problems_to_create.append(ContestProblem(
+                            contest=contest,
+                            problem=problem,
+                            points=1,
+                            order=next_order,
+                            partial=True,
+                        ))
+                        existing_problem_ids.add(problem.id)
+
+                    if contest_problems_to_create:
+                        ContestProblem.objects.bulk_create(contest_problems_to_create)
+                        add_existing_added_count = len(contest_problems_to_create)
+                        add_existing_success = True
+                        add_existing_contest = {
+                            'key': contest.key,
+                            'name': contest.name,
+                            'url': reverse('contest_view', args=[contest.key]),
+                        }
+                        add_existing_form = self._get_add_existing_contest_form(created_items)
+                    elif add_existing_skipped_count > 0:
+                        add_existing_error = _('All selected problems are already in the chosen contest.')
+                    else:
+                        add_existing_error = _('Please select at least one problem to add.')
+
+        report = {
+            'created': created_items,
+            'skipped': [],
+        }
+        contest_org_prefix_map_json = json.dumps(self._build_contest_org_prefix_map(contest_formset))
+        return self.render_to_response(self.get_context_data(
+            report=report,
+            contest_formset=contest_formset,
+            add_existing_contest_form=add_existing_form,
+            contest_org_prefix_map_json=contest_org_prefix_map_json,
+            contest_created_success=False,
+            contests_created_in_submit=0,
+            contest_create_error=None,
+            add_existing_success=add_existing_success,
+            add_existing_added_count=add_existing_added_count,
+            add_existing_skipped_count=add_existing_skipped_count,
+            add_existing_error=add_existing_error,
+            add_existing_contest=add_existing_contest,
+            created_contests=self._build_created_contests(created_contest_keys),
+            created_contest_keys=self._serialize_created_contest_keys(created_contest_keys),
+            available_problem_codes_csv=available_problem_codes_csv,
+            contest_action_mode='add_existing',
         ))
 
     def post(self, request, *args, **kwargs):
         if request.POST.get('form_action') == 'create_contest':
             return self._handle_contest_create_post(request, *args, **kwargs)
+        if request.POST.get('form_action') == 'add_to_existing_contest':
+            return self._handle_add_to_existing_contest_post(request, *args, **kwargs)
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         self.target_organization = form.cleaned_data.get('organization') if form.cleaned_data.get('is_organization') else None
         package = form.cleaned_data['package']
+        copy_buffer_size = 4 * 1024 * 1024
         report = {
             'created': [],
             'skipped': [],
@@ -1501,126 +1635,140 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
             )
 
         try:
-            with zipfile.ZipFile(package.file) as archive:
-                member_name_map = {}
-                for member in archive.namelist():
-                    normalized_name = self._normalize_archive_member_name(member)
-                    if not normalized_name or member.endswith('/'):
-                        continue
-                    member_name_map[normalized_name] = member
+            with transaction.atomic():
+                with zipfile.ZipFile(package.file) as archive:
+                    member_name_map = {}
+                    for member in archive.namelist():
+                        normalized_name = self._normalize_archive_member_name(member)
+                        if not normalized_name or member.endswith('/'):
+                            continue
+                        member_name_map[normalized_name] = member
 
-                valid_member_names = set(self._filter_valid_archive_files(list(member_name_map.keys())))
-                markdown_paths = sorted(
-                    [name for name in valid_member_names if name.lower().endswith('.md')],
-                    key=self._natural_sort_key,
-                )
+                    valid_member_names = set(self._filter_valid_archive_files(list(member_name_map.keys())))
+                    markdown_paths = sorted(
+                        [name for name in valid_member_names if name.lower().endswith('.md')],
+                        key=self._natural_sort_key,
+                    )
 
-                seen_codes = set()
-                allowed_languages = Language.objects.filter(include_in_problem=True)
-                for markdown_path in markdown_paths:
-                    markdown_filename = posixpath.basename(markdown_path)
-                    markdown_stem = posixpath.splitext(markdown_filename)[0]
-                    sanitized_code = self._sanitize_problem_code(markdown_filename)
-                    problem_code = self.build_problem_code(sanitized_code)
-                    markdown_dir = posixpath.dirname(markdown_path)
+                    allowed_languages = list(Language.objects.filter(include_in_problem=True))
+                    candidate_codes = []
+                    for markdown_path in markdown_paths:
+                        markdown_filename = posixpath.basename(markdown_path)
+                        sanitized_code = self._sanitize_problem_code(markdown_filename)
+                        problem_code = self.build_problem_code(sanitized_code)
+                        if problem_code:
+                            candidate_codes.append(problem_code)
 
-                    if not problem_code:
-                        reason = _('Filename produced an empty problem code after sanitization.')
-                        report['skipped'].append({'file': markdown_filename, 'reason': reason})
-                        autoproblem_logger.warning('Skipping markdown file %s: empty sanitized code', markdown_filename)
-                        continue
+                    existing_problem_codes = set(
+                        Problem.objects.filter(code__in=candidate_codes).values_list('code', flat=True)
+                    )
+                    seen_codes = set()
 
-                    if problem_code in seen_codes:
-                        reason = _('Duplicate sanitized code inside upload package.')
-                        report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
-                        autoproblem_logger.warning(
-                            'Skipping markdown file %s: duplicate sanitized code %s inside package',
-                            markdown_filename,
-                            problem_code,
-                        )
-                        continue
-                    seen_codes.add(problem_code)
+                    for markdown_path in markdown_paths:
+                        markdown_filename = posixpath.basename(markdown_path)
+                        markdown_stem = posixpath.splitext(markdown_filename)[0]
+                        sanitized_code = self._sanitize_problem_code(markdown_filename)
+                        problem_code = self.build_problem_code(sanitized_code)
+                        markdown_dir = posixpath.dirname(markdown_path)
 
-                    if Problem.objects.filter(code=problem_code).exists():
-                        reason = _('Problem code already exists in database.')
-                        report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
-                        autoproblem_logger.warning(
-                            'Skipping markdown file %s: code %s already exists',
-                            markdown_filename,
-                            problem_code,
-                        )
-                        continue
+                        if not problem_code:
+                            reason = _('Filename produced an empty problem code after sanitization.')
+                            report['skipped'].append({'file': markdown_filename, 'reason': reason})
+                            autoproblem_logger.warning('Skipping markdown file %s: empty sanitized code', markdown_filename)
+                            continue
 
-                    checker_path = None
-                    checker_filename = None
-                    for candidate_checker in self.get_checker_candidates(markdown_stem, sanitized_code, problem_code):
-                        candidate_path = self._join_archive_path(markdown_dir, candidate_checker)
-                        if candidate_path in valid_member_names:
-                            checker_path = candidate_path
-                            checker_filename = posixpath.basename(candidate_path)
-                            break
-
-                    testcase_archive = None
-                    testcase_path = None
-                    testcase_candidates = self.get_testcase_archive_candidates(markdown_stem, sanitized_code, problem_code)
-                    for candidate_archive in testcase_candidates:
-                        candidate_path = self._join_archive_path(markdown_dir, candidate_archive)
-                        if candidate_path in valid_member_names:
-                            testcase_archive = candidate_archive
-                            testcase_path = candidate_path
-                            break
-
-                    if testcase_path is None:
-                        expected_archive = testcase_candidates[0]
-                        reason = _('Missing testcase archive %(archive)s in the same directory.') % {
-                            'archive': expected_archive,
-                        }
-                        report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
-                        autoproblem_logger.warning(
-                            'Skipping markdown file %s: testcase archive %s missing',
-                            markdown_filename,
-                            expected_archive,
-                        )
-                        continue
-
-                    with tempfile.NamedTemporaryFile(prefix='autoproblem_case_', suffix='.zip') as testcase_tmp:
-                        with archive.open(member_name_map[testcase_path], 'r') as testcase_stream, open(testcase_tmp.name, 'wb') as testcase_out:
-                            shutil.copyfileobj(testcase_stream, testcase_out, length=1024 * 1024)
-
-                        try:
-                            with zipfile.ZipFile(testcase_tmp.name, 'r') as testcase_zip:
-                                valid_files = self._filter_valid_archive_files(testcase_zip.namelist())
-                        except zipfile.BadZipFile:
-                            reason = _('Invalid testcase archive %(archive)s.') % {
-                                'archive': testcase_archive,
-                            }
+                        if problem_code in seen_codes:
+                            reason = _('Duplicate sanitized code inside upload package.')
                             report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
                             autoproblem_logger.warning(
-                                'Skipping markdown file %s: invalid testcase archive %s',
+                                'Skipping markdown file %s: duplicate sanitized code %s inside package',
                                 markdown_filename,
-                                testcase_archive,
+                                problem_code,
+                            )
+                            continue
+                        seen_codes.add(problem_code)
+
+                        if problem_code in existing_problem_codes:
+                            reason = _('Problem code already exists in database.')
+                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                            autoproblem_logger.warning(
+                                'Skipping markdown file %s: code %s already exists',
+                                markdown_filename,
+                                problem_code,
                             )
                             continue
 
-                        testcase_pairs = self._detect_testcase_pairs(valid_files)
-                        if not testcase_pairs:
-                            reason = _('Could not detect matching input/output testcase pairs in %(archive)s.') % {
-                                'archive': testcase_archive,
+                        checker_path = None
+                        checker_filename = None
+                        for candidate_checker in self.get_checker_candidates(markdown_stem, sanitized_code, problem_code):
+                            candidate_path = self._join_archive_path(markdown_dir, candidate_checker)
+                            if candidate_path in valid_member_names:
+                                checker_path = candidate_path
+                                checker_filename = posixpath.basename(candidate_path)
+                                break
+
+                        testcase_archive = None
+                        testcase_path = None
+                        testcase_candidates = self.get_testcase_archive_candidates(markdown_stem, sanitized_code, problem_code)
+                        for candidate_archive in testcase_candidates:
+                            candidate_path = self._join_archive_path(markdown_dir, candidate_archive)
+                            if candidate_path in valid_member_names:
+                                testcase_archive = candidate_archive
+                                testcase_path = candidate_path
+                                break
+
+                        if testcase_path is None:
+                            expected_archive = testcase_candidates[0]
+                            reason = _('Missing testcase archive %(archive)s in the same directory.') % {
+                                'archive': expected_archive,
                             }
                             report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
                             autoproblem_logger.warning(
-                                'Skipping markdown file %s: no recognizable testcase pairs in %s',
+                                'Skipping markdown file %s: testcase archive %s missing',
                                 markdown_filename,
-                                testcase_archive,
+                                expected_archive,
                             )
                             continue
 
-                        with archive.open(member_name_map[markdown_path], 'r') as statement_file:
-                            markdown_content = statement_file.read().decode('utf-8-sig', errors='replace')
-                        problem_name, problem_statement = self._parse_markdown_statement(markdown_content, problem_code)
+                        with tempfile.NamedTemporaryFile(prefix='autoproblem_case_', suffix='.zip') as testcase_tmp:
+                            with archive.open(member_name_map[testcase_path], 'r') as testcase_stream:
+                                shutil.copyfileobj(testcase_stream, testcase_tmp, length=copy_buffer_size)
+                            testcase_tmp.flush()
+                            testcase_tmp.seek(0)
 
-                        with transaction.atomic():
-                            with revisions.create_revision(atomic=True):
+                            try:
+                                with zipfile.ZipFile(testcase_tmp, 'r') as testcase_zip:
+                                    valid_files = self._filter_valid_archive_files(testcase_zip.namelist())
+                            except zipfile.BadZipFile:
+                                reason = _('Invalid testcase archive %(archive)s.') % {
+                                    'archive': testcase_archive,
+                                }
+                                report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                                autoproblem_logger.warning(
+                                    'Skipping markdown file %s: invalid testcase archive %s',
+                                    markdown_filename,
+                                    testcase_archive,
+                                )
+                                continue
+
+                            testcase_pairs = self._detect_testcase_pairs(valid_files)
+                            if not testcase_pairs:
+                                reason = _('Could not detect matching input/output testcase pairs in %(archive)s.') % {
+                                    'archive': testcase_archive,
+                                }
+                                report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                                autoproblem_logger.warning(
+                                    'Skipping markdown file %s: no recognizable testcase pairs in %s',
+                                    markdown_filename,
+                                    testcase_archive,
+                                )
+                                continue
+
+                            with archive.open(member_name_map[markdown_path], 'r') as statement_file:
+                                markdown_content = statement_file.read().decode('utf-8-sig', errors='replace')
+                            problem_name, problem_statement = self._parse_markdown_statement(markdown_content, problem_code)
+
+                            with revisions.create_revision(atomic=False):
                                 problem = Problem.objects.create(
                                     code=problem_code,
                                     name=problem_name,
@@ -1639,17 +1787,18 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                                 problem.allowed_languages.set(allowed_languages)
 
                                 problem_data = ProblemData.objects.create(problem=problem)
-                                with open(testcase_tmp.name, 'rb') as testcase_file:
-                                    testcase_basename = posixpath.basename(testcase_path)
-                                    problem_data.zipfile.save(testcase_basename, File(testcase_file), save=True)
+                                testcase_tmp.seek(0)
+                                testcase_basename = posixpath.basename(testcase_path)
+                                problem_data.zipfile.save(testcase_basename, File(testcase_tmp), save=True)
 
                                 checker_language = self._detect_checker_language(checker_filename) if checker_filename else None
                                 if checker_path and checker_language:
                                     with tempfile.NamedTemporaryFile(prefix='autoproblem_checker_') as checker_tmp:
-                                        with archive.open(member_name_map[checker_path], 'r') as checker_stream, open(checker_tmp.name, 'wb') as checker_out:
-                                            shutil.copyfileobj(checker_stream, checker_out, length=1024 * 1024)
-                                        with open(checker_tmp.name, 'rb') as checker_file:
-                                            problem_data.custom_checker.save(checker_filename, File(checker_file), save=False)
+                                        with archive.open(member_name_map[checker_path], 'r') as checker_stream:
+                                            shutil.copyfileobj(checker_stream, checker_tmp, length=copy_buffer_size)
+                                        checker_tmp.flush()
+                                        checker_tmp.seek(0)
+                                        problem_data.custom_checker.save(checker_filename, File(checker_tmp), save=False)
                                     problem_data.checker = 'bridged'
                                     problem_data.checker_args = json.dumps({
                                         'files': checker_filename,
@@ -1691,17 +1840,18 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
 
                             self.post_problem_created(problem)
 
-                        report['created'].append({
-                            'file': markdown_filename,
-                            'code': problem_code,
-                            'name': problem_name,
-                            'url': reverse('problem_detail', args=[problem_code]),
-                        })
+                            report['created'].append({
+                                'file': markdown_filename,
+                                'code': problem_code,
+                                'name': problem_name,
+                                'url': reverse('problem_detail', args=[problem_code]),
+                            })
 
         except (zipfile.BadZipFile, OSError, ValueError) as e:
             return generic_message(self.request, _('Invalid upload package'), str(e), status=400)
 
         contest_formset = None
+        add_existing_contest_form = None
         can_create_contest = self._can_create_regular_contest() or self._can_create_any_organization_contest()
         if report['created'] and can_create_contest:
             contest_formset = self._get_contest_formset(report['created'], target_organization=self.target_organization)
@@ -1709,14 +1859,27 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
         else:
             contest_org_prefix_map_json = json.dumps({})
 
+        if report['created']:
+            add_existing_contest_form = self._get_add_existing_contest_form(report['created'])
+
         return self.render_to_response(self.get_context_data(
             form=form,
             report=report,
             contest_formset=contest_formset,
+            add_existing_contest_form=add_existing_contest_form,
             contest_org_prefix_map_json=contest_org_prefix_map_json,
+            contest_created_success=False,
+            contests_created_in_submit=0,
+            contest_create_error=None,
+            add_existing_success=False,
+            add_existing_added_count=0,
+            add_existing_skipped_count=0,
+            add_existing_error=None,
+            add_existing_contest=None,
             created_contests=[],
             created_contest_keys='',
             available_problem_codes_csv=','.join(item['code'] for item in report['created']),
+            contest_action_mode='create_new',
         ))
 
 

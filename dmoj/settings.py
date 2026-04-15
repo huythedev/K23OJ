@@ -123,6 +123,11 @@ CELERY_TIMEZONE = 'UTC'
 # has about 5~6 fields, so we need to raise this
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 3000
 
+# Upload temp storage and safety headroom check (used by AutoProblemUploadGuardMiddleware).
+FILE_UPLOAD_TEMP_DIR = os.path.join(BASE_DIR, 'media', 'upload_tmp')
+AUTOPROBLEM_UPLOAD_DISK_MULTIPLIER = 1.15
+AUTOPROBLEM_UPLOAD_DISK_RESERVE_BYTES = 1024 * 1024 * 1024
+
 # List of online judge preset for OJ API
 OJ_PROBLEM_PRESET = [
     {
@@ -436,6 +441,7 @@ MIDDLEWARE = (
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.locale.LocaleMiddleware',
     'judge.middleware.APIMiddleware',
+    'judge.middleware.AutoProblemUploadGuardMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'judge.middleware.MiscConfigMiddleware',

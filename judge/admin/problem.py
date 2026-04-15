@@ -150,6 +150,12 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
     def get_actions(self, request):
         actions = super(ProblemAdmin, self).get_actions(request)
 
+        if request.user.has_perm('judge.delete_problem'):
+            delete_selected = self.get_action('delete_selected')
+            if delete_selected:
+                func, name, desc = delete_selected
+                actions[name] = (func, name, desc)
+
         if request.user.has_perm('judge.change_public_visibility'):
             func, name, desc = self.get_action('make_public_and_update_publish_date')
             actions[name] = (func, name, desc)
@@ -205,6 +211,12 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         self.message_user(request, ngettext('%d problem successfully marked as private.',
                                             '%d problems successfully marked as private.',
                                             count) % count)
+
+    def delete_queryset(self, request, queryset):
+        # `get_queryset` uses `distinct()`, and Django cannot call delete() on a distinct queryset.
+        # Rebuild a plain editable queryset restricted to selected ids, then delete.
+        selected_ids = queryset.values_list('pk', flat=True)
+        Problem.get_editable_problems(request.user).filter(pk__in=selected_ids).delete()
 
     def get_queryset(self, request):
         return Problem.get_editable_problems(request.user).prefetch_related('authors__user').distinct()

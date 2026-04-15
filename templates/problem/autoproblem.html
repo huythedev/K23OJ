@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 
 {% block js_media %}
+    {{ form.media.js }}
+    {% if contest_formset %}
+        {{ contest_formset.media.js }}
+    {% endif %}
+    {% if add_existing_contest_form %}
+        {{ add_existing_contest_form.media.js }}
+    {% endif %}
     <script type="text/javascript">
         $(function () {
             const $isOrganization = $('#id_is_organization');
@@ -157,12 +164,33 @@
                     bindContestForm($contestForms.find('.contest-form-item').last());
                 });
             }
+
+            const $contestActionRadios = $('input[name="contest_action_mode"]');
+            const $createNewContestSection = $('#create-new-contest-section');
+            const $addExistingContestSection = $('#add-existing-contest-section');
+
+            function toggleContestActionSection() {
+                const mode = $contestActionRadios.filter(':checked').val() || 'create_new';
+                $createNewContestSection.toggle(mode === 'create_new');
+                $addExistingContestSection.toggle(mode === 'add_existing');
+            }
+
+            if ($contestActionRadios.length) {
+                $contestActionRadios.on('change', toggleContestActionSection);
+                toggleContestActionSection();
+            }
         });
     </script>
 {% endblock %}
 
 {% block media %}
     {{ form.media.css }}
+    {% if contest_formset %}
+        {{ contest_formset.media.css }}
+    {% endif %}
+    {% if add_existing_contest_form %}
+        {{ add_existing_contest_form.media.css }}
+    {% endif %}
     <link rel="stylesheet" type="text/css" href="{{ static('ui_form.css') }}">
 {% endblock %}
 
@@ -216,21 +244,24 @@
                     </tbody>
                 </table>
 
-                {% if contest_formset %}
+                {% if contest_formset or add_existing_contest_form %}
                     <hr>
-                    <h4>{{ _('Create contest from uploaded problems') }}</h4>
+                    <h4>{{ _('Manage contests with uploaded problems') }}</h4>
 
-                    {% if contest_created_success %}
-                        <p style="color: #1a7f37; font-weight: 600; margin-top: 0.6em;">
-                            {{ _('Created contests in this submit') }}: <b>{{ contests_created_in_submit }}</b>
-                        </p>
-                    {% endif %}
-
-                    {% if contest_create_error %}
-                        <p class="error" style="margin-top: 0.6em;">
-                            {{ contest_create_error }}
-                        </p>
-                    {% endif %}
+                    <div style="display: flex; gap: 1.2em; margin-top: 0.8em; margin-bottom: 0.8em;">
+                        {% if contest_formset %}
+                            <label>
+                                <input type="radio" name="contest_action_mode" value="create_new" {% if contest_action_mode != 'add_existing' %}checked{% endif %}>
+                                {{ _('Create New Contest') }}
+                            </label>
+                        {% endif %}
+                        {% if add_existing_contest_form %}
+                            <label>
+                                <input type="radio" name="contest_action_mode" value="add_existing" {% if contest_action_mode == 'add_existing' or not contest_formset %}checked{% endif %}>
+                                {{ _('Add to Existing Contest') }}
+                            </label>
+                        {% endif %}
+                    </div>
 
                     {% if created_contests %}
                         <h5>{{ _('Created contests in this session') }}</h5>
@@ -252,35 +283,85 @@
                         </table>
                     {% endif %}
 
-                    <form action="" method="post" class="form-area" style="margin-top: 1em;">
-                        {% csrf_token %}
-                        <input type="hidden" name="form_action" value="create_contest">
-                        <input type="hidden" name="available_problem_codes" value="{{ available_problem_codes_csv|default('') }}">
-                        <input type="hidden" name="created_contest_keys" value="{{ created_contest_keys|default('') }}">
+                    {% if contest_formset %}
+                        <div id="create-new-contest-section">
+                            {% if contest_created_success %}
+                                <p style="color: #1a7f37; font-weight: 600; margin-top: 0.6em;">
+                                    {{ _('Created contests in this submit') }}: <b>{{ contests_created_in_submit }}</b>
+                                </p>
+                            {% endif %}
 
-                        {{ contest_formset.management_form }}
+                            {% if contest_create_error %}
+                                <p class="error" style="margin-top: 0.6em;">
+                                    {{ contest_create_error }}
+                                </p>
+                            {% endif %}
 
-                        <div id="contest-formset-container">
-                            {% for contest_form in contest_formset.forms %}
-                                <div class="contest-form-item" style="border: 1px solid #ddd; padding: 0.8em; margin-bottom: 0.8em; border-radius: 4px;">
-                                    <h5 style="margin-top: 0;">{{ _('Contest') }} {{ loop.index }}</h5>
-                                    <table class="django-as-table">{{ contest_form.as_table() }}</table>
+                            <form action="" method="post" class="form-area" style="margin-top: 1em;">
+                                {% csrf_token %}
+                                <input type="hidden" name="form_action" value="create_contest">
+                                <input type="hidden" name="available_problem_codes" value="{{ available_problem_codes_csv|default('') }}">
+                                <input type="hidden" name="created_contest_keys" value="{{ created_contest_keys|default('') }}">
+
+                                {{ contest_formset.management_form }}
+
+                                <div id="contest-formset-container">
+                                    {% for contest_form in contest_formset.forms %}
+                                        <div class="contest-form-item" style="border: 1px solid #ddd; padding: 0.8em; margin-bottom: 0.8em; border-radius: 4px;">
+                                            <h5 style="margin-top: 0;">{{ _('Contest') }} {{ loop.index }}</h5>
+                                            <table class="django-as-table">{{ contest_form.as_table() }}</table>
+                                        </div>
+                                    {% endfor %}
                                 </div>
-                            {% endfor %}
-                        </div>
 
-                        <div style="display: flex; justify-content: space-between; gap: 0.8em; margin-top: 0.8em;">
-                            <button type="button" id="add-contest-form" class="button">{{ _('Add a new contest') }}</button>
-                            <input type="submit" value="{{ _('Create All Contests') }}" class="button">
-                        </div>
+                                <div style="display: flex; justify-content: space-between; gap: 0.8em; margin-top: 0.8em;">
+                                    <button type="button" id="add-contest-form" class="button">{{ _('Add a new contest') }}</button>
+                                    <input type="submit" value="{{ _('Create All Contests') }}" class="button">
+                                </div>
 
-                        <script type="text/template" id="contest-form-template">
-                            <div class="contest-form-item" style="border: 1px solid #ddd; padding: 0.8em; margin-bottom: 0.8em; border-radius: 4px;">
-                                <h5 style="margin-top: 0;">{{ _('Contest') }}</h5>
-                                <table class="django-as-table">{{ contest_formset.empty_form.as_table() }}</table>
-                            </div>
-                        </script>
-                    </form>
+                                <script type="text/template" id="contest-form-template">
+                                    <div class="contest-form-item" style="border: 1px solid #ddd; padding: 0.8em; margin-bottom: 0.8em; border-radius: 4px;">
+                                        <h5 style="margin-top: 0;">{{ _('Contest') }}</h5>
+                                        <table class="django-as-table">{{ contest_formset.empty_form.as_table() }}</table>
+                                    </div>
+                                </script>
+                            </form>
+                        </div>
+                    {% endif %}
+
+                    {% if add_existing_contest_form %}
+                        <div id="add-existing-contest-section">
+                            {% if add_existing_success %}
+                                <p style="color: #1a7f37; font-weight: 600; margin-top: 0.6em;">
+                                    {{ _('Added problems to contest') }}:
+                                    {% if add_existing_contest %}
+                                        <a href="{{ add_existing_contest.url }}"><b>{{ add_existing_contest.key }}</b></a>
+                                    {% endif %}
+                                    &nbsp;|&nbsp;
+                                    {{ _('Added') }}: <b>{{ add_existing_added_count }}</b>
+                                    &nbsp;|&nbsp;
+                                    {{ _('Skipped (already exists)') }}: <b>{{ add_existing_skipped_count }}</b>
+                                </p>
+                            {% endif %}
+
+                            {% if add_existing_error %}
+                                <p class="error" style="margin-top: 0.6em;">
+                                    {{ add_existing_error }}
+                                </p>
+                            {% endif %}
+
+                            <form action="" method="post" class="form-area" style="margin-top: 1em;">
+                                {% csrf_token %}
+                                <input type="hidden" name="form_action" value="add_to_existing_contest">
+                                <input type="hidden" name="available_problem_codes" value="{{ available_problem_codes_csv|default('') }}">
+                                <input type="hidden" name="created_contest_keys" value="{{ created_contest_keys|default('') }}">
+                                <table class="django-as-table">{{ add_existing_contest_form.as_table() }}</table>
+                                <div style="display: flex; justify-content: flex-end; margin-top: 0.8em;">
+                                    <input type="submit" value="{{ _('Add Problems To Contest') }}" class="button">
+                                </div>
+                            </form>
+                        </div>
+                    {% endif %}
                 {% endif %}
             {% endif %}
 

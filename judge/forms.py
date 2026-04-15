@@ -415,6 +415,54 @@ class AutoProblemContestCreateFormSet(formset_factory(AutoProblemContestCreateFo
     pass
 
 
+class AutoProblemAddToExistingContestForm(Form):
+    existing_contest = forms.ModelChoiceField(
+        queryset=Contest.objects.none(),
+        required=True,
+        label=_('Existing Contest'),
+        widget=HeavySelect2Widget(data_view='contest_select2', attrs={'style': 'width: 100%'}),
+    )
+    selected_problems = forms.MultipleChoiceField(
+        choices=(),
+        label=_('Selected Problems'),
+        widget=forms.CheckboxSelectMultiple,
+        required=True,
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        self.problem_choices = kwargs.pop('problem_choices', [])
+        super().__init__(*args, **kwargs)
+        self.fields['selected_problems'].choices = self.problem_choices
+        self.fields['existing_contest'].queryset = self._get_editable_contests_queryset()
+
+    def _get_editable_contests_queryset(self):
+        if self.user is None or not self.user.is_authenticated:
+            return Contest.objects.none()
+
+        queryset = Contest.objects.none()
+        if self.user.has_perm('judge.change_contest') or self.user.has_perm('judge.edit_all_contest'):
+            queryset = Contest.objects.all()
+        else:
+            filters = []
+            if self.user.has_perm('judge.edit_own_contest'):
+                filters.append(Q(authors=self.user.profile) | Q(curators=self.user.profile))
+            filters.append(Q(is_organization_private=True, organizations__admins=self.user.profile))
+            if filters:
+                q = filters[0]
+                for filter_expr in filters[1:]:
+                    q |= filter_expr
+                queryset = Contest.objects.filter(q)
+
+        return queryset.distinct().order_by('-start_time', 'key')
+
+    def clean_existing_contest(self):
+        contest = self.cleaned_data['existing_contest']
+        if not self.fields['existing_contest'].queryset.filter(pk=contest.pk).exists():
+            raise ValidationError(_('You do not have permission to edit this contest.'))
+        return contest
+
+
 class ProblemImportPolygonStatementForm(Form):
     polygon_language = forms.CharField()
     site_language = forms.CharField()
