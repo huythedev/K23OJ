@@ -1183,6 +1183,22 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
             return ['%s.zip' % sanitized_code, '%s.zip' % problem_code]
         return ['%s.zip' % problem_code]
 
+    def get_checker_candidates(self, sanitized_code, problem_code):
+        if self.target_organization is not None and sanitized_code != problem_code:
+            return ['%s_checker.cpp' % sanitized_code, '%s_checker.cpp' % problem_code]
+        return ['%s_checker.cpp' % problem_code]
+
+    @staticmethod
+    def _detect_checker_language(checker_filename):
+        extension = os.path.splitext(checker_filename)[1].lower()
+        if extension == '.cpp':
+            return 'CPP17'
+        if extension == '.pas':
+            return 'PAS'
+        if extension == '.java':
+            return 'JAVA8'
+        return None
+
     def assign_problem_ownership(self, problem):
         if self.target_organization is not None:
             problem.authors.add(self.request.user.profile)
@@ -1285,6 +1301,15 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                             )
                             continue
 
+                        checker_path = None
+                        checker_filename = None
+                        for candidate_checker in self.get_checker_candidates(sanitized_code, problem_code):
+                            candidate_path = os.path.join(os.path.dirname(markdown_path), candidate_checker)
+                            if os.path.isfile(candidate_path):
+                                checker_path = candidate_path
+                                checker_filename = os.path.basename(candidate_path)
+                                break
+
                         testcase_archive = None
                         testcase_path = None
                         for candidate_archive in self.get_testcase_archive_candidates(sanitized_code, problem_code):
@@ -1362,6 +1387,18 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                                 with open(testcase_path, 'rb') as testcase_file:
                                     testcase_basename = os.path.basename(testcase_path)
                                     problem_data.zipfile.save(testcase_basename, File(testcase_file), save=True)
+
+                                checker_language = self._detect_checker_language(checker_filename) if checker_filename else None
+                                if checker_path and checker_language:
+                                    with open(checker_path, 'rb') as checker_file:
+                                        problem_data.custom_checker.save(checker_filename, File(checker_file), save=False)
+                                    problem_data.checker = 'bridged'
+                                    problem_data.checker_args = json.dumps({
+                                        'files': checker_filename,
+                                        'lang': checker_language,
+                                        'type': 'default',
+                                    })
+                                    problem_data.save(update_fields=('custom_checker', 'checker', 'checker_args'))
 
 
 
