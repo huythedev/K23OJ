@@ -1,7 +1,7 @@
 {% macro make_status(case) %}
     {% set partial = (case.status == 'AC' and  case.points < case.total) %}
-    <span title="{{ case.long_status }}" class="case-{%- if partial -%}_AC{% else %}{{- case.result_class -}}{%- endif -%}">
-        {%- if case.status == 'SC' %}&mdash;{% elif partial %}{{_("Partial Accepted")}}{% else %}{{ case.long_status }}{% endif -%}
+    <span title="{% if case.status == 'HD' %}{{ _('Hidden') }}{% else %}{{ case.long_status }}{% endif %}" class="case-{%- if partial -%}_AC{% else %}{{- case.result_class -}}{%- endif -%}">
+        {%- if case.status == 'SC' %}&mdash;{% elif case.status == 'HD' %}{{ _('Hidden') }}{% elif partial %}{{_("Partial Accepted")}}{% else %}{{ case.long_status }}{% endif -%}
     </span>
 {% endmacro %}
 
@@ -175,12 +175,18 @@
             {% if submission.result != "AB" %}
                 {% if can_view_testcase_status %}
                     <b>{{ _('Resources:') }}</b>
-                    {% if submission.result == "TLE" %}
+                    {% if mask_new_ioi_hidden %}
+                        <span>---</span>
+                    {% elif submission.result == "TLE" %}
                         <span>---,</span>
                     {% else %}
                         <span title="{{ submission.time }}s">{{ submission.time|floatformat(3) }}s,</span>
                     {% endif %}
-                    {{ submission.memory|kbdetailformat }}
+                    {% if mask_new_ioi_hidden %}
+                        ---
+                    {% else %}
+                        {{ submission.memory|kbdetailformat }}
+                    {% endif %}
                     <br>
                 {% endif %}
                 {% if is_pretest %}
@@ -188,10 +194,14 @@
                 {% else %}
                     <b>{{ _('Final score:') }}</b>
                 {% endif %}
-                {{ submission.case_points|floatformat(-3) }}/{{ submission.case_total|floatformat(0) }}
+                {% if mask_new_ioi_hidden %}
+                    0/{{ submission.case_total|floatformat(0) }}
+                {% else %}
+                    {{ submission.case_points|floatformat(-3) }}/{{ submission.case_total|floatformat(0) }}
+                {% endif %}
                 {% if request.in_contest and submission.contest_or_none %}
                     {% with contest=submission.contest_or_none %}
-                        {% set points=contest.points|roundfloat(3) %}
+                        {% set points=contest_display_points|roundfloat(3) %}
                         {% set total=contest.problem.points|floatformat(-1) %}
                         ({{ _('%(points)s/%(total)s points', points=points, total=total) }})
                     {% endwith %}

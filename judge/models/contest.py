@@ -760,6 +760,8 @@ class ContestSubmission(models.Model):
     participation = models.ForeignKey(ContestParticipation, verbose_name=_('participation'), on_delete=CASCADE,
                                       related_name='submissions', related_query_name='submission')
     points = models.FloatField(default=0.0, verbose_name=_('points'))
+    visible_points = models.FloatField(default=0.0, verbose_name=_('visible points'))
+    hidden_points = models.FloatField(default=0.0, verbose_name=_('hidden points'))
     is_pretest = models.BooleanField(verbose_name=_('is pretested'),
                                      help_text=_('Whether this submission was ran only on pretests.'),
                                      default=False)

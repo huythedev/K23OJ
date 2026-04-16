@@ -30,6 +30,7 @@ from judge.models import Contest, Language, Organization, Problem, ProblemTransl
 from judge.models.problem import ProblemTestcaseResultAccess, SubmissionSourceAccess
 from judge.utils.infinite_paginator import InfinitePaginationMixin
 from judge.utils.lazy import memo_lazy
+from judge.utils.new_ioi import get_hidden_batches_for_problem, should_mask_submission_hidden_results
 from judge.utils.problem_data import get_problem_testcases_data
 from judge.utils.problems import get_result_data, user_completed_ids, user_editable_ids, user_tester_ids
 from judge.utils.raw_sql import join_sql_subquery, use_straight_join
@@ -233,6 +234,43 @@ def group_test_cases(cases):
     return result, status, test_case_count
 
 
+def mask_new_ioi_hidden_batches(submission, user, batches, statuses):
+    if not should_mask_submission_hidden_results(submission, user=user):
+        return batches, statuses
+
+    hidden_batches = get_hidden_batches_for_problem(submission.problem, is_pretested=submission.is_pretested)
+    if not hidden_batches:
+        return batches, statuses
+
+    for batch in batches:
+        if batch['id'] not in hidden_batches:
+            continue
+
+        batch['points'] = 0
+        batch['total'] = 0
+        batch['status'] = 'HD'
+        batch['long_status'] = _('Hidden')
+
+        for case in batch['cases']:
+            case.status = 'HD'
+            case.time = 0
+            case.memory = 0
+            case.points = 0
+            case.total = 0
+            case.feedback = ''
+            case.extended_feedback = ''
+            case.output = ''
+
+    masked_statuses = []
+    for case in statuses:
+        if case.batch in hidden_batches:
+            masked_statuses.append(TestCase(id=case.id, status='HD', batch=case.batch, num_combined=case.num_combined))
+        else:
+            masked_statuses.append(case)
+
+    return batches, masked_statuses
+
+
 class SubmissionStatus(SubmissionDetailBase):
     template_name = 'submission/status.html'
 
@@ -242,8 +280,12 @@ class SubmissionStatus(SubmissionDetailBase):
     def get_context_data(self, **kwargs):
         context = super(SubmissionStatus, self).get_context_data(**kwargs)
         submission = self.object
+        context['mask_new_ioi_hidden'] = should_mask_submission_hidden_results(submission, self.request.user)
 
         context['batches'], statuses, test_case_count = group_test_cases(submission.test_cases.all())
+        context['batches'], statuses = mask_new_ioi_hidden_batches(
+            submission, self.request.user, context['batches'], statuses,
+        )
 
         context['feedback_limit'] = min(3, test_case_count - 1)
         # In case the submission is in an on-going contest, we don't want to show any feedback.
@@ -270,6 +312,12 @@ class SubmissionStatus(SubmissionDetailBase):
         context['can_view_feedback'] = self.request.user.is_superuser or \
             submission.problem.allow_view_feedback
         context['time_limit'] = submission.problem.time_limit
+        if hasattr(submission, 'contest') and context['mask_new_ioi_hidden']:
+            context['contest_display_points'] = submission.contest.visible_points
+        elif hasattr(submission, 'contest'):
+            context['contest_display_points'] = submission.contest.points
+        else:
+            context['contest_display_points'] = None
         try:
             lang_limit = submission.problem.language_limits.get(language=submission.language)
         except ObjectDoesNotExist:
@@ -472,6 +520,13 @@ class SubmissionsListBase(DiggPaginatorMixin, TitleMixin, ListView):
         context['my_submissions_link'] = self.get_my_submissions_page()
         context['all_submissions_link'] = self.get_all_submissions_page()
         context['tab'] = self.tab
+
+        for submission in context['submissions']:
+            submission._new_ioi_masked = should_mask_submission_hidden_results(submission, self.request.user)
+            if submission._new_ioi_masked and hasattr(submission, 'contest'):
+                submission._new_ioi_visible_points = submission.contest.visible_points
+            else:
+                submission._new_ioi_visible_points = submission.points
         return context
 
     def get(self, request, *args, **kwargs):
@@ -677,6 +732,11 @@ def single_submission(request):
     submission = get_object_or_404(submission_related(Submission.objects.all()), id=int(request.GET['id']))
     if not submission.problem.is_accessible_by(request.user):
         raise Http404()
+    submission._new_ioi_masked = should_mask_submission_hidden_results(submission, request.user)
+    if submission._new_ioi_masked and hasattr(submission, 'contest'):
+        submission._new_ioi_visible_points = submission.contest.visible_points
+    else:
+        submission._new_ioi_visible_points = submission.points
 
     return render(request, 'submission/row.html', {
         'submission': submission,

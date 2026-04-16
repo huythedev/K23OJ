@@ -13,6 +13,7 @@ from judge.models import (
     Contest, ContestParticipation, ContestTag, Judge, Language, Organization, Problem, ProblemType, Profile, Rating,
     Submission,
 )
+from judge.utils.new_ioi import get_hidden_batches_for_problem, should_mask_submission_hidden_results
 from judge.utils.infinite_paginator import InfinitePaginationMixin
 from judge.utils.raw_sql import join_sql_subquery, use_straight_join
 from judge.views.submission import group_test_cases
@@ -610,25 +611,30 @@ class APISubmissionList(APIListView):
                 'result',
                 'contest_object__key',
                 'contest__points',
+                'contest__visible_points',
                 'contest__participation__virtual',
                 'contest__participation__real_start',
             )
         )
 
     def get_object_data(self, submission):
+        mask_hidden = should_mask_submission_hidden_results(submission, self.request.user)
+        contest_points = submission.contest.visible_points if (hasattr(submission, 'contest') and mask_hidden) \
+            else (submission.contest.points if hasattr(submission, 'contest') else None)
+
         return {
             'id': submission.id,
             'problem': submission.problem.code,
             'user': submission.user.user.username,
             'date': submission.date.isoformat(),
             'language': submission.language.key,
-            'time': submission.time,
-            'memory': submission.memory,
-            'points': submission.points,
-            'result': submission.result,
+            'time': 0 if mask_hidden else submission.time,
+            'memory': 0 if mask_hidden else submission.memory,
+            'points': contest_points if contest_points is not None else submission.points,
+            'result': 'Hidden' if mask_hidden else submission.result,
             'contest': None if not submission.contest_object else {
                 'key': submission.contest_object.key,
-                'points': submission.contest.points,
+                'points': contest_points if contest_points is not None else submission.contest.points,
                 'virtual_participation_number': submission.contest.participation.virtual,
                 'time_since_start_of_participation': submission.date - submission.contest.participation.real_start,
             },
@@ -647,16 +653,21 @@ class APISubmissionDetail(APILoginRequiredMixin, APIDetailView):
         return submission
 
     def get_object_data(self, submission):
+        mask_hidden = should_mask_submission_hidden_results(submission, self.request.user)
+        hidden_batches = get_hidden_batches_for_problem(submission.problem, is_pretested=submission.is_pretested) \
+            if mask_hidden else set()
+
         cases = []
         for batch in group_test_cases(submission.test_cases.all())[0]:
+            is_hidden_batch = batch['id'] in hidden_batches
             batch_cases = [
                 {
                     'type': 'case',
                     'case_id': case.case,
-                    'status': case.status,
-                    'time': case.time,
-                    'memory': case.memory,
-                    'points': case.points,
+                    'status': 'Hidden' if is_hidden_batch else case.status,
+                    'time': 0 if is_hidden_batch else case.time,
+                    'memory': 0 if is_hidden_batch else case.memory,
+                    'points': 0 if is_hidden_batch else case.points,
                     'total': case.total,
                 } for case in batch['cases']
             ]
@@ -670,22 +681,26 @@ class APISubmissionDetail(APILoginRequiredMixin, APIDetailView):
                     'type': 'batch',
                     'batch_id': batch['id'],
                     'cases': batch_cases,
-                    'points': batch['points'],
+                    'points': 0 if is_hidden_batch else batch['points'],
                     'total': batch['total'],
                 })
+
+        visible_contest_points = None
+        if hasattr(submission, 'contest') and mask_hidden:
+            visible_contest_points = submission.contest.visible_points
 
         return {
             'id': submission.id,
             'problem': submission.problem.code,
             'user': submission.user.user.username,
             'date': submission.date.isoformat(),
-            'time': submission.time,
-            'memory': submission.memory,
-            'points': submission.points,
+            'time': 0 if mask_hidden else submission.time,
+            'memory': 0 if mask_hidden else submission.memory,
+            'points': visible_contest_points if visible_contest_points is not None else submission.points,
             'language': submission.language.key,
             'status': submission.status,
-            'result': submission.result,
-            'case_points': submission.case_points,
+            'result': 'Hidden' if mask_hidden else submission.result,
+            'case_points': 0 if mask_hidden else submission.case_points,
             'case_total': submission.case_total,
             'cases': cases,
         }

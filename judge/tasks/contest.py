@@ -9,13 +9,16 @@ from celery import shared_task
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.storage import default_storage
+from django.db import transaction
+from django.utils import timezone
 from django.utils.translation import gettext as _
 from moss import MOSS
 
+from judge import event_poster as event
 from judge.models import Contest, ContestMoss, ContestParticipation, ContestSubmission, Problem, Submission
 from judge.utils.celery import Progress
 
-__all__ = ('rescore_contest', 'run_moss', 'prepare_contest_data')
+__all__ = ('rescore_contest', 'run_moss', 'prepare_contest_data', 'reveal_new_ioi_contests')
 rewildcard = re.compile(r'\*+')
 logger = logging.getLogger('judge.celery')
 
@@ -144,3 +147,33 @@ def prepare_contest_data(self, contest_id, options):
         data_file.close()
 
     return length
+
+
+@shared_task(bind=True)
+def reveal_new_ioi_contests(self):
+    now = timezone.now()
+    contests = Contest.objects.filter(format_name='new_ioi', end_time__lte=now)
+
+    revealed = 0
+    for contest in contests.iterator():
+        config = dict(contest.format_config or {})
+        if not config.get('reveal_after_end', True):
+            continue
+        if config.get('revealed_at'):
+            continue
+
+        with transaction.atomic():
+            for participation in contest.users.iterator():
+                participation.recompute_results()
+
+            config['revealed_at'] = now.isoformat()
+            contest.format_config = config
+            contest.save(update_fields=['format_config'])
+
+        event.post(f'contest_{contest.id_secret}', {
+            'type': 'new-ioi-revealed',
+            'contest': contest.id,
+        })
+        revealed += 1
+
+    return revealed

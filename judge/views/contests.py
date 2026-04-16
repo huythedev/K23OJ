@@ -43,10 +43,12 @@ from judge.models import Contest, ContestAnnouncement, ContestCategory, ContestM
 from judge.tasks import on_new_contest, prepare_contest_data, run_moss
 from judge.utils.celery import redirect_to_task_status, task_status_by_id, task_status_url_by_id
 from judge.utils.cms import parse_csv_ranking
+from judge.utils.new_ioi import can_view_new_ioi_hidden, should_mask_live_hidden
 from judge.utils.opengraph import generate_opengraph
 from judge.utils.problems import _get_result_data, user_attempted_ids, user_completed_ids
 from judge.utils.ranker import ranker
 from judge.utils.stats import get_bar_chart, get_pie_chart, get_stacked_bar_chart
+from judge.utils.timedelta import nice_repr
 from judge.utils.views import DiggPaginatorMixin, QueryStringSortMixin, SingleObjectFormView, TitleMixin, \
     add_file_response, generic_message
 
@@ -1036,6 +1038,46 @@ def contest_ranking_list(contest, problems, frozen=False):
 def get_contest_ranking_list(request, contest, participation=None, ranking_list=contest_ranking_list, ranker=ranker):
     problems = list(contest.contest_problems.select_related('problem').defer('problem__description').order_by('order'))
     users, total_ac = ranking_list(contest, problems)
+
+    if contest.format_name == 'new_ioi' and should_mask_live_hidden(contest) and can_view_new_ioi_hidden(contest, request.user):
+        admin_users = []
+        show_time = bool((contest.format_config or {}).get('cumtime', False))
+
+        for user in users:
+            format_data = user.participation.format_data or {}
+            aggregate = format_data.get('__new_ioi__', {})
+            admin_points = aggregate.get('admin_total', user.points)
+            admin_cumtime = aggregate.get('admin_cumtime', user.cumtime)
+
+            problem_cells = []
+            for contest_problem in problems:
+                problem_data = format_data.get(str(contest_problem.id), {})
+                points = problem_data.get('admin_points', problem_data.get('points', 0))
+                dt = problem_data.get('admin_time', problem_data.get('time', 0))
+                problem_cells.append(format_html(
+                    '<td class="{state}"><a href="{url}">{points}<div class="solving-time">{time}</div></a></td>',
+                    state=contest.format.best_solution_state(points, contest_problem.points),
+                    url=reverse('contest_user_submissions',
+                                args=[contest.key, user.user.username, contest_problem.problem.code]),
+                    points=floatformat(points, -contest.points_precision),
+                    time=nice_repr(timedelta(seconds=dt), 'noday') if show_time else '',
+                ))
+
+            result_cell = format_html(
+                '<td class="user-points"><a href="{url}">{points}<div class="solving-time">{cumtime}</div></a></td>',
+                url=reverse('contest_all_user_submissions', args=[contest.key, user.user.username]),
+                points=floatformat(admin_points, -contest.points_precision),
+                cumtime=nice_repr(timedelta(seconds=admin_cumtime), 'noday') if show_time else '',
+            )
+
+            admin_users.append(user._replace(
+                points=admin_points,
+                cumtime=admin_cumtime,
+                problem_cells=problem_cells,
+                result_cell=result_cell,
+            ))
+        users = admin_users
+
     users = ranker(users, key=attrgetter('points', 'cumtime', 'tiebreaker'))
 
     return users, problems, total_ac

@@ -1,7 +1,9 @@
 {% set can_view, can_edit = submission_layout(submission, profile_id, request.user, completed_problem_ids, editable_problem_ids, tester_problem_ids) %}
 <div class="sub-result {{ submission.result_class }}">
     <div class="score">
-        {%- if submission.is_graded -%}
+        {%- if submission._new_ioi_masked -%}
+            ---
+        {%- elif submission.is_graded -%}
             {%- if submission.status in ('IE', 'CE', 'AB') -%}
                 ---
             {%- else -%}
@@ -13,7 +15,7 @@
     </div>
 
     <div class="state">
-        <span title="{{ submission.long_status }}" class="status">{{ submission.short_status }}</span> |
+        <span title="{% if submission._new_ioi_masked %}{{ _('Hidden') }}{% else %}{{ submission.long_status }}{% endif %}" class="status">{% if submission._new_ioi_masked %}HD{% else %}{{ submission.short_status }}{% endif %}</span> |
         <span class="language">{{ submission.language.short_display_name }}</span>
     </div>
 </div>
@@ -93,7 +95,7 @@
 
 
 <div class="sub-usage">
-    {% if submission.status in ('QU', 'P', 'G', 'CE', 'IE', 'AB') or not can_view_testcase_status %}
+    {% if submission._new_ioi_masked or submission.status in ('QU', 'P', 'G', 'CE', 'IE', 'AB') or not can_view_testcase_status %}
         <div class="time">---</div>
         <div class="memory">---</div>
     {% else %}

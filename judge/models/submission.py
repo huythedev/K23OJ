@@ -14,6 +14,7 @@ from judge.judgeapi import abort_submission, judge_submission
 from judge.models.problem import Problem, SubmissionSourceAccess
 from judge.models.profile import Profile
 from judge.models.runtime import Language
+from judge.utils.new_ioi import contest_is_new_ioi, get_hidden_batches_for_problem
 from judge.utils.unicode import utf8bytes
 
 __all__ = ['SUBMISSION_RESULT', 'Submission', 'SubmissionSource', 'SubmissionTestCase']
@@ -183,13 +184,45 @@ class Submission(models.Model):
         except AttributeError:
             return
 
+        contest_obj = contest.participation.contest
         contest_problem = contest.problem
         contest.points = round(self.case_points / self.case_total * contest_problem.points
                                if self.case_total > 0 else 0, 3)
+        contest.visible_points = contest.points
+        contest.hidden_points = 0
+
+        if contest_is_new_ioi(contest_obj):
+            hidden_batches = get_hidden_batches_for_problem(self.problem, is_pretested=self.is_pretested)
+            visible_case_points = 0.0
+            hidden_case_points = 0.0
+
+            grouped = {}
+            for test_case in self.test_cases.all().only('batch', 'points'):
+                if test_case.points is None:
+                    continue
+                batch_id = test_case.batch
+                if batch_id is None:
+                    grouped.setdefault(None, []).append(test_case.points)
+                else:
+                    grouped.setdefault(batch_id, []).append(test_case.points)
+
+            for batch_id, points_list in grouped.items():
+                earned_points = min(points_list) if batch_id is not None else sum(points_list)
+                if batch_id is not None and batch_id in hidden_batches:
+                    hidden_case_points += earned_points
+                else:
+                    visible_case_points += earned_points
+
+            if self.case_total > 0:
+                ratio = contest_problem.points / self.case_total
+                contest.visible_points = round(visible_case_points * ratio, 3)
+                contest.hidden_points = round(hidden_case_points * ratio, 3)
 
         partial = (contest_problem.partial and contest_problem.problem.partial)
         if not partial and contest.points != contest_problem.points:
             contest.points = 0
+            contest.visible_points = 0
+            contest.hidden_points = 0
 
         contest.save()
         contest.participation.recompute_results()

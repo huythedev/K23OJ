@@ -37,6 +37,13 @@ app.conf.beat_schedule = {
             'expires': 60 * 60 * 24,
         },
     },
+    'new-ioi-reveal-checker': {
+        'task': 'judge.tasks.contest.reveal_new_ioi_contests',
+        'schedule': crontab(minute='*/1'),
+        'options': {
+            'expires': 55,
+        },
+    },
 }
 
 
