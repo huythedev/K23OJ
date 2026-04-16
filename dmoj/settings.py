@@ -124,7 +124,8 @@ CELERY_TIMEZONE = 'UTC'
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 3000
 
 # Upload temp storage and safety headroom check (used by AutoProblemUploadGuardMiddleware).
-FILE_UPLOAD_TEMP_DIR = os.path.join(BASE_DIR, 'media', 'upload_tmp')
+# Resolved after loading local settings so it can follow MEDIA_ROOT overrides.
+FILE_UPLOAD_TEMP_DIR = None
 AUTOPROBLEM_UPLOAD_DISK_MULTIPLIER = 1.15
 AUTOPROBLEM_UPLOAD_DISK_RESERVE_BYTES = 1024 * 1024 * 1024
 
@@ -795,6 +796,12 @@ try:
         exec(f.read(), globals())
 except IOError:
     pass
+
+# Keep upload temp path deployment-agnostic by deriving from MEDIA_ROOT.
+if not globals().get('MEDIA_ROOT'):
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+FILE_UPLOAD_TEMP_DIR = os.path.join(MEDIA_ROOT, 'upload_tmp')
+os.makedirs(FILE_UPLOAD_TEMP_DIR, exist_ok=True)
 
 USE_X_FORWARDED_HOST = True
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024 * 1024  # 10GB
