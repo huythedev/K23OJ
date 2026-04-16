@@ -1157,8 +1157,13 @@ class ContestRanking(ContestRankingBase):
 
     @property
     def cache_key(self):
+        new_ioi_visibility = 'na'
+        if self.object.format_name == 'new_ioi' and should_mask_live_hidden(self.object):
+            # Keep masked and hidden-visible ranking tables in separate cache entries.
+            new_ioi_visibility = 'hidden' if can_view_new_ioi_hidden(self.object, self.request.user) else 'masked'
+
         return f'contest_ranking_cache_{self.object.key}_{self.show_virtual}_{self.is_frozen}_' \
-               f'{self.request.LANGUAGE_CODE}'
+               f'{self.request.LANGUAGE_CODE}_{new_ioi_visibility}'
 
     @property
     def bypass_cache_ranking(self):

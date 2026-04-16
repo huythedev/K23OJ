@@ -18,7 +18,6 @@ from judge.models import BlogPost, Comment, Contest, ContestAnnouncement, Contes
     EFFECTIVE_MATH_ENGINES, Judge, Language, License, MiscConfig, Organization, Problem, Profile, Submission, \
     WebAuthnCredential
 from judge.tasks import on_new_comment
-from judge.tasks.contest import LIVE_UPDATE_CONTEST_FORMATS, update_participation_for_submission
 from judge.views.register import RegistrationView
 
 logger = logging.getLogger('judge.signals')
@@ -145,24 +144,6 @@ def submission_create(sender, instance, created, **kwargs):
         return
 
     submission_started(instance)
-
-
-@receiver(post_save, sender=Submission)
-def submission_new_ioi_recompute(sender, instance, created, **kwargs):
-    if created or hasattr(instance, '_updating_stats_only'):
-        return
-    if instance.status != 'D' or instance.contest_object_id is None:
-        return
-    if instance.contest_object is None or instance.contest_object.format_name not in LIVE_UPDATE_CONTEST_FORMATS:
-        return
-
-    logger.debug(
-        'Queueing async participation recompute for submission id=%s contest id=%s format=%s',
-        instance.id,
-        instance.contest_object_id,
-        instance.contest_object.format_name,
-    )
-    transaction.on_commit(lambda: update_participation_for_submission.delay(instance.id))
 
 
 @receiver(post_delete, sender=ContestSubmission)

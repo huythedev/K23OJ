@@ -25,5 +25,8 @@ def invalidate_contest_ranking_cache(contest):
     for show_virtual in (False, True):
         for is_frozen in (False, True):
             for lang, _ in settings.LANGUAGES:
-                keys.append(f'contest_ranking_cache_{contest.key}_{show_virtual}_{is_frozen}_{lang}')
+                for new_ioi_visibility in ('na', 'masked', 'hidden'):
+                    keys.append(
+                        f'contest_ranking_cache_{contest.key}_{show_virtual}_{is_frozen}_{lang}_{new_ioi_visibility}'
+                    )
     cache.delete_many(keys)
