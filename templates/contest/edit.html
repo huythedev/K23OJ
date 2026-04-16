@@ -132,6 +132,9 @@
                 <a href="{{ url('admin:judge_contest_change', contest.id) }}">{{ _('Edit contest in admin panel for more options') }}</a>
             </div>
         {% endif %}
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 1em;">
+            <a class="submit-bar" href="{{ url('contest_export_resolver', contest.key) }}">{{ _('Export Resolver JSON') }}</a>
+        </div>
     {% endblock %}
     <form action="" method="post" class="form-area" style="display: flex; justify-content: center; flex-direction: column;">
         {% csrf_token %}

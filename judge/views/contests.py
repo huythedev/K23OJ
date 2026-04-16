@@ -53,7 +53,7 @@ from judge.utils.views import DiggPaginatorMixin, QueryStringSortMixin, SingleOb
 __all__ = ['ContestList', 'ContestDetail', 'ContestRanking', 'ContestJoin', 'ContestLeave', 'ContestCalendar',
            'ContestClone', 'ContestStats', 'ContestMossView', 'ContestMossDelete',
            'ContestParticipationList', 'ContestParticipationDisqualify', 'get_contest_ranking_list',
-           'base_contest_ranking_list']
+           'base_contest_ranking_list', 'ContestResolverExportView']
 
 
 class ContestCategoryList(TitleMixin, ListView):
@@ -1585,4 +1585,89 @@ class ContestDownloadData(ContestDataMixin, SingleObjectMixin, View):
 
         response['Content-Type'] = 'application/zip'
         response['Content-Disposition'] = 'attachment; filename=%s-data.zip' % self.object.key
+        return response
+
+
+class ContestResolverExportView(ContestMixin, LoginRequiredMixin, SingleObjectMixin, View):
+    def get_object(self, queryset=None):
+        contest = super().get_object(queryset)
+        if not (self.request.user.is_superuser or contest.is_editable_by(self.request.user) or
+                self.request.user.has_perm('judge.change_contest')):
+            raise PermissionDenied(_('You are not allowed to export resolver data for this contest.'))
+        return contest
+
+    def get(self, request, *args, **kwargs):
+        contest = self.get_object()
+
+        contest_problems = list(
+            contest.contest_problems.select_related('problem').order_by('order', 'id')
+        )
+        contest_problem_by_problem_id = {
+            contest_problem.problem_id: contest_problem for contest_problem in contest_problems
+        }
+        problems_payload = []
+        for contest_problem in contest_problems:
+            problems_payload.append({
+                'problemId': contest_problem.problem_id,
+                'name': contest_problem.problem.name,
+                'points': int(contest_problem.points),
+            })
+
+        submission_queryset = (
+            Submission.objects
+            .filter(
+                contest_object=contest,
+                date__gte=contest.start_time,
+                date__lte=contest.end_time,
+            )
+            .select_related('user', 'problem', 'user__user')
+            .prefetch_related(Prefetch(
+                'user__organizations',
+                queryset=Organization.objects.filter(is_unlisted=False).only('id', 'name'),
+            ))
+            .order_by('date', 'id')
+        )
+
+        users_payload = []
+        user_ids = set()
+        submissions_payload = []
+
+        for submission in submission_queryset:
+            profile = submission.user
+            if profile.id not in user_ids:
+                user_ids.add(profile.id)
+                full_name = profile.user.get_full_name()
+                users_payload.append({
+                    'userId': profile.id,
+                    'username': profile.username,
+                    'fullName': full_name or profile.username,
+                })
+
+            contest_problem = contest_problem_by_problem_id.get(submission.problem_id)
+            global_max = float(submission.problem.points) if submission.problem.points else 1.0
+            raw_points = float(submission.points) if submission.points is not None else 0.0
+            if contest_problem is not None:
+                scaled_points = (raw_points / global_max) * float(contest_problem.points)
+            else:
+                scaled_points = raw_points
+
+            submissions_payload.append({
+                'submissionId': submission.id,
+                'problemId': submission.problem_id,
+                'userId': profile.id,
+                'time': str((submission.date - contest.start_time).total_seconds()),
+                'points': round(scaled_points, 2),
+            })
+
+        payload = {
+            'users': users_payload,
+            'problems': problems_payload,
+            'submissions': submissions_payload,
+        }
+
+        response = HttpResponse(
+            json.dumps(payload, ensure_ascii=False),
+            content_type='application/json',
+        )
+        response['Content-Disposition'] = 'attachment; filename=data.json'
         return response
