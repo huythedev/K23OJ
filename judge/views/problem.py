@@ -6,6 +6,7 @@ import re
 import shutil
 import threading
 import tempfile
+import time
 import uuid
 import zipfile
 from datetime import timedelta
@@ -738,6 +739,30 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
             except Exception:
                 autoproblem_logger.exception('Failed to schedule on_new_problem for %s', problem.code)
 
+    def move_staged_file_to_storage(staged_path, storage_name):
+        if not staged_path or not os.path.exists(staged_path):
+            return
+
+        # ProblemDataStorage is filesystem-backed, so moving avoids a second large file copy when possible.
+        try:
+            target_path = problem_data_storage.path(storage_name)
+            target_dir = os.path.dirname(target_path)
+            if target_dir and not os.path.isdir(target_dir):
+                os.makedirs(target_dir)
+            if os.path.exists(target_path):
+                os.remove(target_path)
+            shutil.move(staged_path, target_path)
+            return
+        except Exception:
+            pass
+
+        with open(staged_path, 'rb') as staged_file:
+            problem_data_storage.save(storage_name, File(staged_file))
+        try:
+            os.remove(staged_path)
+        except OSError:
+            pass
+
     upload_tmp_dir = os.path.dirname(zip_file_path)
 
     try:
@@ -917,63 +942,74 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                     })
 
             created_problem_payloads = []
-            total_prepared = len(prepared_problems)
             set_task_state('PROGRESS', current=0, total=0, message=_('Saving problems to database...'))
             with transaction.atomic():
+                now = timezone.now()
+                Problem.objects.bulk_create([
+                    Problem(
+                        code=prepared_problem['code'],
+                        name=prepared_problem['name'],
+                        description=prepared_problem['statement'],
+                        time_limit=1,
+                        memory_limit=262144,
+                        points=1,
+                        partial=True,
+                        group=default_group,
+                        submission_source_visibility_mode=SubmissionSourceAccess.FOLLOW,
+                        testcase_visibility_mode=ProblemTestcaseAccess.AUTHOR_ONLY,
+                        date=now,
+                        is_test_ready=False,
+                        autoproblem_task_id=task_id,
+                        is_organization_private=(target_organization is not None),
+                    )
+                    for prepared_problem in prepared_problems
+                ])
+
+                created_problems_by_code = {
+                    problem.code: problem
+                    for problem in Problem.objects.filter(code__in=[item['code'] for item in prepared_problems])
+                }
+
                 for prepared_problem in prepared_problems:
+                    problem = created_problems_by_code.get(prepared_problem['code'])
+                    if problem is None:
+                        continue
 
-                    with revisions.create_revision(atomic=False):
-                        problem = Problem.objects.create(
-                            code=prepared_problem['code'],
-                            name=prepared_problem['name'],
-                            description=prepared_problem['statement'],
-                            time_limit=1,
-                            memory_limit=262144,
+                    assign_problem_ownership(problem, user, target_organization)
+                    problem.types.add(default_type)
+                    problem.allowed_languages.set(allowed_languages)
+
+                    problem_data = ProblemData.objects.create(problem=problem)
+                    update_fields = []
+                    problem_data.zipfile.name = prepared_problem['testcase_storage_name']
+                    update_fields.append('zipfile')
+
+                    if prepared_problem['checker_storage_name'] and prepared_problem['checker_language']:
+                        problem_data.custom_checker.name = prepared_problem['checker_storage_name']
+                        problem_data.checker = 'bridged'
+                        problem_data.checker_args = json.dumps({
+                            'files': prepared_problem['checker_filename'],
+                            'lang': prepared_problem['checker_language'],
+                            'type': 'default',
+                        })
+                        update_fields.extend(['custom_checker', 'checker', 'checker_args'])
+
+                    problem_data.save(update_fields=tuple(update_fields))
+
+                    cases = [
+                        ProblemTestCase(
+                            dataset=problem,
+                            order=case_index,
+                            type='C',
+                            input_file=input_file,
+                            output_file=output_file,
                             points=1,
-                            partial=True,
-                            group=default_group,
-                            submission_source_visibility_mode=SubmissionSourceAccess.FOLLOW,
-                            testcase_visibility_mode=ProblemTestcaseAccess.AUTHOR_ONLY,
-                            date=timezone.now(),
+                            is_pretest=False,
+                            is_sample=False,
                         )
-                        assign_problem_ownership(problem, user, target_organization)
-                        problem.types.add(default_type)
-                        problem.allowed_languages.set(allowed_languages)
-
-                        problem_data = ProblemData.objects.create(problem=problem)
-                        update_fields = []
-                        problem_data.zipfile.name = prepared_problem['testcase_storage_name']
-                        update_fields.append('zipfile')
-
-                        if prepared_problem['checker_storage_name'] and prepared_problem['checker_language']:
-                            problem_data.custom_checker.name = prepared_problem['checker_storage_name']
-                            problem_data.checker = 'bridged'
-                            problem_data.checker_args = json.dumps({
-                                'files': prepared_problem['checker_filename'],
-                                'lang': prepared_problem['checker_language'],
-                                'type': 'default',
-                            })
-                            update_fields.extend(['custom_checker', 'checker', 'checker_args'])
-
-                        problem_data.save(update_fields=tuple(update_fields))
-
-                        cases = [
-                            ProblemTestCase(
-                                dataset=problem,
-                                order=case_index,
-                                type='C',
-                                input_file=input_file,
-                                output_file=output_file,
-                                points=1,
-                                is_pretest=False,
-                                is_sample=False,
-                            )
-                            for case_index, (input_file, output_file) in enumerate(prepared_problem['testcase_pairs'], start=1)
-                        ]
-                        ProblemTestCase.objects.bulk_create(cases)
-
-                        revisions.set_comment(_('Bulk-created from /autoproblem upload'))
-                        revisions.set_user(user)
+                        for case_index, (input_file, output_file) in enumerate(prepared_problem['testcase_pairs'], start=1)
+                    ]
+                    ProblemTestCase.objects.bulk_create(cases)
 
                     prepared_problem['problem'] = problem
                     prepared_problem['problem_data'] = problem_data
@@ -984,6 +1020,7 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                         'code': prepared_problem['code'],
                         'name': prepared_problem['name'],
                         'url': reverse('problem_detail', args=[prepared_problem['code']]),
+                        'is_test_ready': False,
                     })
 
             total_generation = len(created_problem_payloads)
@@ -994,21 +1031,42 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                     total=total_generation,
                     message='Generating testcases for %s...' % created_problem['problem'].code,
                 )
+                time.sleep(0.1)
 
-                with open(created_problem['testcase_stage_path'], 'rb') as testcase_file:
-                    problem_data_storage.save(created_problem['testcase_storage_name'], File(testcase_file))
+                try:
+                    move_staged_file_to_storage(
+                        created_problem['testcase_stage_path'],
+                        created_problem['testcase_storage_name'],
+                    )
 
-                if created_problem['checker_storage_name'] and created_problem['checker_stage_path']:
-                    with open(created_problem['checker_stage_path'], 'rb') as checker_file:
-                        problem_data_storage.save(created_problem['checker_storage_name'], File(checker_file))
+                    if created_problem['checker_storage_name'] and created_problem['checker_stage_path']:
+                        move_staged_file_to_storage(
+                            created_problem['checker_stage_path'],
+                            created_problem['checker_storage_name'],
+                        )
 
-                ProblemDataCompiler.generate(
-                    created_problem['problem'],
-                    created_problem['problem_data'],
-                    created_problem['problem'].cases.order_by('order'),
-                    created_problem['testcase_valid_files'],
-                )
-                post_problem_created(created_problem['problem'], target_organization)
+                    ProblemDataCompiler.generate(
+                        created_problem['problem'],
+                        created_problem['problem_data'],
+                        created_problem['problem'].cases.order_by('order'),
+                        created_problem['testcase_valid_files'],
+                    )
+
+                    created_problem['problem'].is_test_ready = True
+                    created_problem['problem'].save(update_fields=('is_test_ready',))
+                    time.sleep(0.1)
+                    post_problem_created(created_problem['problem'], target_organization)
+                except Exception as problem_error:
+                    autoproblem_logger.exception(
+                        'Phase 3 generation failed for %s in task %s',
+                        created_problem['problem'].code,
+                        task_id,
+                    )
+                    report['skipped'].append({
+                        'file': created_problem.get('file', '-'),
+                        'code': created_problem['problem'].code,
+                        'reason': str(problem_error),
+                    })
 
             result_payload = {
                 'report': report,
@@ -1053,6 +1111,65 @@ def autoproblem_task_status(request, task_id):
     if response_payload.get('state') == 'SUCCESS':
         response_payload['redirect_url'] = '%s?task_id=%s' % (reverse('problem_autoproblem'), task_key)
     return JsonResponse(response_payload)
+
+
+@login_required
+def autoproblem_task_details(request, task_id):
+    task_key = str(task_id)
+    task = cache.get(task_key)
+    if task and task.get('owner_id') != request.user.id:
+        return JsonResponse({'state': 'FAILURE', 'message': _('You are not allowed to access this task.')}, status=403)
+
+    result = (task or {}).get('result') or {}
+    report_items_by_code = {
+        item.get('code'): item
+        for item in (result.get('report') or {}).get('created', [])
+        if item.get('code')
+    }
+
+    profile = request.profile
+    problems = list(
+        Problem.objects
+            .filter(autoproblem_task_id=task_key)
+            .filter(Q(authors=profile) | Q(curators=profile))
+            .distinct()
+            .order_by('date', 'id')
+    )
+
+    # Fallback to created_codes while task is still in memory but DB task linkage is not available.
+    if not problems:
+        created_codes = result.get('created_codes') or (task or {}).get('created_codes') or []
+        if created_codes:
+            problems_by_code = {
+                problem.code: problem
+                for problem in Problem.objects.filter(code__in=created_codes)
+            }
+            problems = [problems_by_code[code] for code in created_codes if code in problems_by_code]
+
+    items = []
+    for problem in problems:
+        report_item = report_items_by_code.get(problem.code, {})
+        items.append({
+            'file': report_item.get('file', '-'),
+            'code': problem.code,
+            'name': problem.name,
+            'url': reverse('problem_detail', args=[problem.code]),
+            'is_test_ready': problem.is_test_ready,
+        })
+
+    state = 'PENDING'
+    if task:
+        state = task.get('state', 'PENDING')
+    elif items:
+        state = 'PROGRESS'
+
+    ready_count = sum(1 for item in items if item['is_test_ready'])
+    return JsonResponse({
+        'state': state,
+        'current': ready_count,
+        'total': len(items),
+        'problems': items,
+    })
 
 
 class ProblemSubmit(LoginRequiredMixin, ProblemMixin, TitleMixin, SingleObjectFormView):
@@ -1734,6 +1851,7 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                 'code': problem.code,
                 'name': problem.name,
                 'url': reverse('problem_detail', args=[problem.code]),
+                'is_test_ready': problem.is_test_ready,
             })
         return created_items
 
@@ -1994,40 +2112,72 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
 
     def get(self, request, *args, **kwargs):
         task_id = request.GET.get('task_id')
-        if task_id:
-            task_data = cache.get(task_id)
-            if task_data and task_data.get('owner_id') == request.user.id and task_data.get('state') == 'SUCCESS':
+        force_check = request.GET.get('force_check') == '1'
+        if task_id or force_check:
+            task_data = cache.get(task_id) if task_id else None
+            result = {}
+            report = {'created': [], 'skipped': []}
+            created_codes = []
+            target_organization_id = None
+
+            if task_data and task_data.get('owner_id') == request.user.id:
                 result = task_data.get('result') or {}
-                created_codes = result.get('created_codes') or task_data.get('created_codes') or []
+                report = result.get('report') or report
+                created_codes.extend(result.get('created_codes') or task_data.get('created_codes') or [])
+                target_organization_id = result.get('target_organization_id')
 
+            if task_id:
+                task_db_codes = list(
+                    Problem.objects
+                        .filter(autoproblem_task_id=task_id)
+                        .filter(Q(authors=request.profile) | Q(curators=request.profile))
+                        .order_by('date', 'id')
+                        .values_list('code', flat=True)
+                )
+                created_codes.extend(task_db_codes)
+
+            # Rescue/discovery mode for stalled cache state: include recent authored/curated problems.
+            if force_check or not created_codes:
+                recent_threshold = timezone.now() - timedelta(minutes=30)
+                recent_codes = list(
+                    Problem.objects
+                        .filter(date__gte=recent_threshold)
+                        .filter(Q(authors=request.profile) | Q(curators=request.profile))
+                        .order_by('-date')
+                        .values_list('code', flat=True)
+                )
+                created_codes.extend(recent_codes)
+
+            merged_codes = list(dict.fromkeys(code for code in created_codes if code))
+            if merged_codes:
+                problems_by_code = {
+                    problem.code: problem
+                    for problem in Problem.objects.filter(code__in=merged_codes)
+                }
+                report_items_by_code = {
+                    item.get('code'): item
+                    for item in report.get('created', [])
+                    if item.get('code')
+                }
                 created_items = []
-                if created_codes:
-                    problems_by_code = {
-                        problem.code: problem
-                        for problem in Problem.objects.filter(code__in=created_codes)
-                    }
-                    created_items = [
-                        {
-                            'file': '-',
-                            'code': code,
-                            'name': problems_by_code[code].name,
-                            'url': reverse('problem_detail', args=[code]),
-                        }
-                        for code in created_codes
-                        if code in problems_by_code
-                    ]
-
-                report = result.get('report') or {'created': [], 'skipped': []}
-                if created_items:
-                    report['created'] = created_items
-                else:
-                    created_items = report.get('created', [])
+                for code in merged_codes:
+                    problem = problems_by_code.get(code)
+                    if problem is None:
+                        continue
+                    report_item = report_items_by_code.get(code, {})
+                    created_items.append({
+                        'file': report_item.get('file', '-'),
+                        'code': problem.code,
+                        'name': problem.name,
+                        'url': reverse('problem_detail', args=[problem.code]),
+                        'is_test_ready': problem.is_test_ready,
+                    })
+                report['created'] = created_items
 
                 available_problem_codes_csv = result.get('available_problem_codes_csv') or \
                     ','.join(item['code'] for item in created_items)
 
                 target_organization = None
-                target_organization_id = result.get('target_organization_id')
                 if target_organization_id:
                     target_organization = Organization.objects.filter(pk=target_organization_id).first()
 
@@ -2043,6 +2193,7 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                 return self.render_to_response(self.get_context_data(
                     form=self.get_form(),
                     report=report,
+                    current_task_id=task_id or '',
                     contest_formset=contest_formset,
                     add_existing_contest_form=add_existing_contest_form,
                     contest_org_prefix_map_json=contest_org_prefix_map_json,

@@ -105,6 +105,8 @@ urlpatterns = [
     path('', blog.PostList.as_view(template_name='home.html', title=_('Home')), kwargs={'page': 1}, name='home'),
     path('autoproblem', problem.ProblemAutoProblem.as_view(), name='problem_autoproblem'),
     path('autoproblem/status/<uuid:task_id>', problem.autoproblem_task_status, name='problem_autoproblem_status'),
+        path('autoproblem/status/<uuid:task_id>/details', problem.autoproblem_task_details,
+            name='problem_autoproblem_status_details'),
     path('500/', exception),
     path('admin/', admin.site.urls),
     path('i18n/', include('django.conf.urls.i18n')),
@@ -120,6 +122,8 @@ urlpatterns = [
         path('/autoproblem', problem.ProblemAutoProblem.as_view(), name='problem_autoproblem_legacy'),
            path('/autoproblem/status/<uuid:task_id>', problem.autoproblem_task_status,
                name='problem_autoproblem_status_legacy'),
+           path('/autoproblem/status/<uuid:task_id>/details', problem.autoproblem_task_details,
+               name='problem_autoproblem_status_details_legacy'),
         path('/import-polygon', problem.ProblemImportPolygon.as_view(), name='problem_import_polygon'),
     ])),
 

@@ -64,6 +64,7 @@
             const $uploadSpeedText = $('#upload-speed-text');
             const $uploadStatusMessage = $('#upload-status-message');
             const $uploadLoadingIcon = $('#upload-loading-icon');
+            const $uploadRescueButton = $('#upload-rescue-button');
             const $uploadSubmit = $('#autoproblem-upload-button');
 
             function formatBytes(bytes) {
@@ -88,6 +89,7 @@
                 $uploadSpeedText.text('0.00 MB/s');
                 $uploadStatusMessage.text('');
                 $uploadLoadingIcon.hide();
+                $uploadRescueButton.hide();
             }
 
             function setLoadingState(isLoading) {
@@ -103,10 +105,124 @@
                 return basePath + '/status/' + encodeURIComponent(taskId);
             }
 
+            function buildTaskDetailsUrl(taskId) {
+                const basePath = window.location.pathname.replace(/\/$/, '');
+                return basePath + '/status/' + encodeURIComponent(taskId) + '/details';
+            }
+
+            function escapeHtml(value) {
+                return String(value || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+
+            function updateCreatedProblemsTable(items) {
+                const $tableBody = $('#created-problems-table-body');
+                if ($tableBody.length === 0) {
+                    return;
+                }
+
+                const existingRows = {};
+                $tableBody.find('tr[data-problem-code]').each(function () {
+                    const $row = $(this);
+                    existingRows[$row.attr('data-problem-code')] = $row;
+                });
+
+                items.forEach(function (item) {
+                    const code = item.code;
+                    if (!code) {
+                        return;
+                    }
+
+                    const isReady = !!item.is_test_ready;
+                    const statusText = isReady ? 'Ready' : 'Processing Tests...';
+                    let $row = existingRows[code];
+
+                    if (!$row || $row.length === 0) {
+                        const rowHtml = [
+                            '<tr data-problem-code="', escapeHtml(code), '" data-test-ready="', isReady ? '1' : '0', '">',
+                            '<td>', escapeHtml(item.file || '-'), '</td>',
+                            '<td><a href="', escapeHtml(item.url || '#'), '">', escapeHtml(code), '</a></td>',
+                            '<td>', escapeHtml(item.name || code), '</td>',
+                            '<td class="problem-ready-status">', escapeHtml(statusText), '</td>',
+                            '</tr>'
+                        ].join('');
+                        $tableBody.append(rowHtml);
+                        return;
+                    }
+
+                    $row.attr('data-test-ready', isReady ? '1' : '0');
+                    $row.find('td').eq(0).text(item.file || '-');
+                    $row.find('td').eq(1).find('a').attr('href', item.url || '#').text(code);
+                    $row.find('td').eq(2).text(item.name || code);
+                    $row.find('.problem-ready-status').text(statusText);
+                });
+            }
+
+            function startReportDetailsPollingIfNeeded() {
+                const reportTaskId = $('#report-task-id').val();
+                const $tableBody = $('#created-problems-table-body');
+                if (!reportTaskId || $tableBody.length === 0) {
+                    return;
+                }
+
+                function hasPendingRows() {
+                    return $tableBody.find('tr[data-test-ready="0"]').length > 0;
+                }
+
+                if (!hasPendingRows()) {
+                    return;
+                }
+
+                const detailsUrl = buildTaskDetailsUrl(reportTaskId);
+                let timer = null;
+
+                async function fetchDetails() {
+                    try {
+                        const response = await fetch(detailsUrl, {
+                            method: 'GET',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });by
+                        if (!response.ok) {
+                            return;
+                        }
+
+                        const payload = await response.json();
+                        if (Array.isArray(payload.problems)) {
+                            updateCreatedProblemsTable(payload.problems);
+                        }
+
+                        if (payload.state === 'SUCCESS' || !hasPendingRows()) {
+                            if (timer) {
+                                clearInterval(timer);
+                                timer = null;
+                            }
+                        }
+                    } catch (error) {
+                        // Keep best-effort polling; ignore transient failures.
+                    }
+                }
+
+                timer = setInterval(fetchDetails, 2500);
+                fetchDetails();
+            }
+
             function pollUploadTask(taskId) {
                 const statusUrl = buildTaskStatusUrl(taskId);
                 let pollTimer = null;
                 let processingStarted = false;
+                let lastProgressValue = null;
+                let lastProgressAt = Date.now();
+
+                $uploadRescueButton.hide();
+                $uploadRescueButton.off('click').on('click', function () {
+                    window.location.href = '?task_id=' + encodeURIComponent(taskId) + '&force_check=1';
+                });
 
                 function stopPolling() {
                     if (pollTimer) {
@@ -132,6 +248,15 @@
                             if (total > 0) {
                                 processingStarted = true;
                                 const percent = Math.min(100, Math.floor((current / total) * 100));
+                                const progressValue = current + '/' + total;
+                                if (progressValue !== lastProgressValue) {
+                                    lastProgressValue = progressValue;
+                                    lastProgressAt = Date.now();
+                                    $uploadRescueButton.hide();
+                                } else if ((Date.now() - lastProgressAt) >= 20000) {
+                                    $uploadRescueButton.show();
+                                }
+
                                 $uploadProgressBar.css('background', '#3b82f6');
                                 $uploadProgressBar.css('width', percent + '%');
                                 $uploadProgressText.text(percent + '%');
@@ -142,6 +267,14 @@
                                 );
                             }
                         } else if (!processingStarted && taskData.state === 'PENDING') {
+                            const pendingValue = 'PENDING:' + Number(taskData.current || 0);
+                            if (pendingValue !== lastProgressValue) {
+                                lastProgressValue = pendingValue;
+                                lastProgressAt = Date.now();
+                                $uploadRescueButton.hide();
+                            } else if ((Date.now() - lastProgressAt) >= 20000) {
+                                $uploadRescueButton.show();
+                            }
                             setLoadingState(true);
                             $uploadStatusMessage.text(taskData.message || 'Upload complete! Initializing background processor...');
                         }
@@ -149,6 +282,7 @@
                         if (taskData.state === 'SUCCESS') {
                             stopPolling();
                             setLoadingState(false);
+                            $uploadRescueButton.hide();
                             $uploadProgressBar.css('width', '100%');
                             $uploadProgressBar.css('background', '#16a34a');
                             $uploadProgressText.text('100%');
@@ -163,12 +297,14 @@
                         if (taskData.state === 'FAILURE') {
                             stopPolling();
                             setLoadingState(false);
+                            $uploadRescueButton.hide();
                             alert(taskData.message || 'Upload failed.');
                             $uploadSubmit.prop('disabled', false);
                         }
                     } catch (error) {
                         stopPolling();
                         setLoadingState(false);
+                        $uploadRescueButton.hide();
                         alert('Could not fetch upload progress. Please try again.');
                         $uploadSubmit.prop('disabled', false);
                     }
@@ -333,6 +469,8 @@
                 $contestActionRadios.on('change', toggleContestActionSection);
                 toggleContestActionSection();
             }
+
+            startReportDetailsPollingIfNeeded();
         });
     </script>
 {% endblock %}
@@ -369,6 +507,7 @@
 
 {% block body %}
     <input type="hidden" id="contest-org-prefix-map" value="{{ contest_org_prefix_map_json|default('{}')|escape }}">
+    <input type="hidden" id="report-task-id" value="{{ current_task_id|default('')|escape }}">
     <form id="autoproblem-upload-form" action="" method="post" class="form-area centered-form" enctype="multipart/form-data" style="display: flex; justify-content: center; flex-direction: column;">
         {% csrf_token %}
         <input type="hidden" name="form_action" value="upload">
@@ -385,6 +524,9 @@
                 <div>{{ _('Progress') }}: <b id="upload-progress-text">0%</b></div>
                 <div>{{ _('Uploaded') }}: <b id="upload-size-text">0 B / 0 B</b></div>
                 <div>{{ _('Speed') }}: <b id="upload-speed-text">0.00 MB/s</b></div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; margin-top: 0.6em;">
+                <button id="upload-rescue-button" type="button" class="button" style="display: none;">{{ _('Check Created Problems Anyway') }}</button>
             </div>
         </div>
         <hr>
@@ -410,14 +552,22 @@
                             <th>{{ _('Markdown file') }}</th>
                             <th>{{ _('Problem code') }}</th>
                             <th>{{ _('Problem name') }}</th>
+                            <th>{{ _('Status') }}</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="created-problems-table-body">
                         {% for item in report.created %}
-                            <tr>
+                            <tr data-problem-code="{{ item.code }}" data-test-ready="{% if item.is_test_ready %}1{% else %}0{% endif %}">
                                 <td>{{ item.file }}</td>
                                 <td><a href="{{ item.url }}">{{ item.code }}</a></td>
                                 <td>{{ item.name }}</td>
+                                <td class="problem-ready-status">
+                                    {% if item.is_test_ready %}
+                                        {{ _('Ready') }}
+                                    {% else %}
+                                        {{ _('Processing Tests...') }}
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>

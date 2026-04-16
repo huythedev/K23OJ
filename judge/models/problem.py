@@ -224,6 +224,8 @@ class Problem(models.Model):
         help_text=_('Allow user to view checker feedback.'),
         default=False,
     )
+    autoproblem_task_id = models.CharField(max_length=36, blank=True, default='', db_index=True)
+    is_test_ready = models.BooleanField(default=False, db_index=True)
 
     __original_points = None
 
