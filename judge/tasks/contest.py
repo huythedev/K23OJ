@@ -15,12 +15,20 @@ from django.utils.translation import gettext as _
 from moss import MOSS
 
 from judge import event_poster as event
+from judge.caching import invalidate_contest_ranking_cache
 from judge.models import Contest, ContestMoss, ContestParticipation, ContestSubmission, Problem, Submission
 from judge.utils.celery import Progress
 
-__all__ = ('rescore_contest', 'run_moss', 'prepare_contest_data', 'reveal_new_ioi_contests')
+__all__ = (
+    'rescore_contest',
+    'run_moss',
+    'prepare_contest_data',
+    'reveal_new_ioi_contests',
+    'update_participation_for_submission',
+)
 rewildcard = re.compile(r'\*+')
 logger = logging.getLogger('judge.celery')
+LIVE_UPDATE_CONTEST_FORMATS = frozenset({'new_ioi'})
 
 
 @shared_task(bind=True)
@@ -177,3 +185,65 @@ def reveal_new_ioi_contests(self):
         revealed += 1
 
     return revealed
+
+
+@shared_task(bind=True)
+def update_participation_for_submission(self, submission_id):
+    submission = Submission.objects.select_related('contest_object').filter(id=submission_id).first()
+    if submission is None:
+        logger.warning('update_participation_for_submission: missing submission id=%s', submission_id)
+        return False
+
+    if submission.status != 'D':
+        logger.debug(
+            'update_participation_for_submission: skip submission id=%s status=%s',
+            submission_id,
+            submission.status,
+        )
+        return False
+
+    contest = submission.contest_object
+    if contest is None or contest.format_name not in LIVE_UPDATE_CONTEST_FORMATS:
+        logger.debug(
+            'update_participation_for_submission: skip submission id=%s contest=%s format=%s',
+            submission_id,
+            getattr(contest, 'id', None),
+            getattr(contest, 'format_name', None),
+        )
+        return False
+
+    contest_submission = ContestSubmission.objects.filter(submission_id=submission_id) \
+        .select_related('participation__contest').first()
+    if contest_submission is None:
+        logger.warning(
+            'update_participation_for_submission: missing ContestSubmission for submission id=%s',
+            submission_id,
+        )
+        return False
+
+    participation = contest_submission.participation
+    participation.recompute_results()
+    logger.info(
+        'update_participation_for_submission: recomputed participation id=%s contest id=%s format=%s '
+        'score=%s frozen_score=%s',
+        participation.id,
+        participation.contest_id,
+        participation.contest.format_name,
+        participation.score,
+        participation.frozen_score,
+    )
+
+    # Explicitly clear ranking cache for live-updating formats after each graded submission.
+    invalidate_contest_ranking_cache(participation.contest)
+
+    payload = {
+        'type': 'score-changed',
+        'contest': participation.contest_id,
+        'participation': participation.id,
+        'submission': submission_id,
+    }
+    event.post('contest_%d' % participation.contest_id, {'type': 'update'})
+    event.post('contest_%d' % participation.contest_id, payload)
+    event.post(f'contest_{participation.contest.id_secret}', {'type': 'update'})
+    event.post(f'contest_{participation.contest.id_secret}', payload)
+    return True
