@@ -6,7 +6,7 @@
 {% endmacro %}
 
 {% macro make_batch_status(batch, cnt) %}
-    {% if is_new_ioi_submission %}
+    {% if restrict_new_ioi_feedback %}
         <b>{{ _('Subtask #%(id)d', id=cnt) }}</b>
     {% else %}
         <b>{{ _('Batch #%(id)d', id=cnt) }}</b>
@@ -17,7 +17,7 @@
         <span class="fa fa-spinner fa-pulse"></span>
     {% endif %}
 
-    {% if is_new_ioi_submission and not batch.not_graded %}
+    {% if restrict_new_ioi_feedback and not batch.not_graded %}
         {% set verdict = namespace(case=None) %}
         {% for case in batch.cases %}
             {% if verdict.case is none and (case.status != 'AC' or case.points < case.total) %}
@@ -37,6 +37,7 @@
 {% endif %}
 {% set is_pretest = submission.is_pretested %}
 {% set is_new_ioi_submission = submission.contest_object and submission.contest_object.format_name == 'new_ioi' %}
+{% set restrict_new_ioi_feedback = is_new_ioi_submission and not can_view_new_ioi_test_details %}
 
 {% if submission.status != 'IE' %}
     {% if submission.status == 'QU' %}
@@ -60,7 +61,7 @@
         <br>
         {% if can_view_testcase_status or can_view_batch_status %}
         {% if statuses or not submission.is_graded %}
-            {% if is_new_ioi_submission %}
+            {% if restrict_new_ioi_feedback %}
                 {% for batch in batches if batch.id %}
                     {% if batch.not_graded %}
                         <span class="fa fa-spinner fa-pulse"></span>
@@ -112,13 +113,13 @@
         {% set test_case_id = counter() %}
         {% set test_case_counter = counter() %}
         {% for batch in batches %}
-            {% if not is_new_ioi_submission or batch.id %}
+            {% if not restrict_new_ioi_feedback or batch.id %}
                 {% if batch.id %}
                     {{ make_batch_status(batch, test_case_id()) }}
                     <br>
                     <div class="batch-cases">
                 {% endif %}
-        {% if can_view_testcase_status and not is_new_ioi_submission %}
+        {% if can_view_testcase_status and not restrict_new_ioi_feedback %}
         <table class="submissions-status-table">{% for case in batch.cases %}
             {% set current_test_case_count = test_case_counter() %}
             {% set print_case_output = can_view_test and case.output %}

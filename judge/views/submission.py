@@ -30,7 +30,7 @@ from judge.models import Contest, Language, Organization, Problem, ProblemTransl
 from judge.models.problem import ProblemTestcaseResultAccess, SubmissionSourceAccess
 from judge.utils.infinite_paginator import InfinitePaginationMixin
 from judge.utils.lazy import memo_lazy
-from judge.utils.new_ioi import contest_is_new_ioi, get_hidden_batches_for_problem, should_mask_submission_hidden_results
+from judge.utils.new_ioi import can_view_new_ioi_hidden, contest_is_new_ioi, get_hidden_batches_for_problem, should_mask_submission_hidden_results
 from judge.utils.problem_data import get_problem_testcases_data
 from judge.utils.problems import get_result_data, user_completed_ids, user_editable_ids, user_tester_ids
 from judge.utils.raw_sql import join_sql_subquery, use_straight_join
@@ -338,6 +338,7 @@ class SubmissionStatus(SubmissionDetailBase):
         context = super(SubmissionStatus, self).get_context_data(**kwargs)
         submission = self.object
         context['mask_new_ioi_hidden'] = should_mask_submission_hidden_results(submission, self.request.user)
+        context['can_view_new_ioi_test_details'] = can_view_new_ioi_hidden(submission.contest_object, self.request.user)
         context['new_ioi_visible_case_points'] = submission.case_points
         context['new_ioi_visible_case_total'] = submission.case_total
 
