@@ -89,6 +89,13 @@
                         update_ranking();
                     }
                 });
+
+                if (window.event_dispatcher) {
+                    event_dispatcher.on('contest_{{ contest.id_secret }}', function () {
+                        ranking_outdated = true;
+                        update_ranking();
+                    });
+                }
                 setTimeout(update_ranking, 10000);
             });
         </script>

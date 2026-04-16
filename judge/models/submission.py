@@ -181,7 +181,7 @@ class Submission(models.Model):
     def update_contest(self):
         try:
             contest = self.contest
-        except AttributeError:
+        except (AttributeError, ObjectDoesNotExist):
             return
 
         contest_obj = contest.participation.contest

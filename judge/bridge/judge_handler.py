@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from judge import event_poster as event
 from judge.bridge.base_handler import ZlibPacketHandler, proxy_list
-from judge.caching import finished_submission
+from judge.caching import finished_submission, invalidate_contest_ranking_cache
 from judge.models import Judge, Language, LanguageLimit, Problem, Profile, \
     RuntimeVersion, Submission, SubmissionTestCase
 from judge.models.problem import ProblemTestcaseResultAccess
@@ -462,6 +462,9 @@ class JudgeHandler(ZlibPacketHandler):
         problem.update_stats()
         submission.update_contest()
         submission.update_credit(total_time)
+        if submission.contest_object_id is not None and submission.contest_object is not None:
+            if submission.contest_object.format_name == 'new_ioi':
+                invalidate_contest_ranking_cache(submission.contest_object)
 
         finished_submission(submission)
 
@@ -469,6 +472,8 @@ class JudgeHandler(ZlibPacketHandler):
         if hasattr(submission, 'contest'):
             participation = submission.contest.participation
             event.post('contest_%d' % participation.contest_id, {'type': 'update'})
+        if submission.contest_object_id is not None and submission.contest_object is not None:
+            event.post(f'contest_{submission.contest_object.id_secret}', {'type': 'update'})
         self._post_update_submission(submission.id, 'grading-end', done=True)
 
     def on_compile_error(self, packet):

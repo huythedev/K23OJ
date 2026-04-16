@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.cache import cache
 
 
@@ -16,4 +17,13 @@ def finished_submission(sub):
         participation = sub.contest.participation
         keys += ['contest_complete:%d' % participation.id]
         keys += ['contest_attempted:%d' % participation.id]
+    cache.delete_many(keys)
+
+
+def invalidate_contest_ranking_cache(contest):
+    keys = []
+    for show_virtual in (False, True):
+        for is_frozen in (False, True):
+            for lang, _ in settings.LANGUAGES:
+                keys.append(f'contest_ranking_cache_{contest.key}_{show_virtual}_{is_frozen}_{lang}')
     cache.delete_many(keys)

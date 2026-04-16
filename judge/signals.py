@@ -13,6 +13,7 @@ from registration.models import RegistrationProfile
 from registration.signals import user_registered
 
 from judge.caching import contest_submission_started, finished_submission, submission_started
+from judge import event_poster as event
 from judge.models import BlogPost, Comment, Contest, ContestAnnouncement, ContestProblem, ContestSubmission, \
     EFFECTIVE_MATH_ENGINES, Judge, Language, License, MiscConfig, Organization, Problem, Profile, Submission, \
     WebAuthnCredential
@@ -141,6 +142,24 @@ def submission_create(sender, instance, created, **kwargs):
         return
 
     submission_started(instance)
+
+
+@receiver(post_save, sender=Submission)
+def submission_new_ioi_recompute(sender, instance, created, **kwargs):
+    if created or hasattr(instance, '_updating_stats_only'):
+        return
+    if instance.status != 'D' or instance.contest_object_id is None:
+        return
+    if instance.contest_object is None or instance.contest_object.format_name != 'new_ioi':
+        return
+
+    contest_submission = ContestSubmission.objects.filter(submission_id=instance.id).select_related('participation').first()
+    if contest_submission is None:
+        return
+
+    contest_submission.participation.recompute_results()
+    event.post('contest_%d' % contest_submission.participation.contest_id, {'type': 'update'})
+    event.post(f'contest_{contest_submission.participation.contest.id_secret}', {'type': 'update'})
 
 
 @receiver(post_delete, sender=ContestSubmission)

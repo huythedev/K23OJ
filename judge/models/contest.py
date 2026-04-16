@@ -630,6 +630,9 @@ class ContestParticipation(models.Model):
                 self.cumtime = 0
                 self.tiebreaker = 0
                 self.save(update_fields=['score', 'cumtime', 'tiebreaker'])
+            if self.contest.format_name == 'new_ioi':
+                from judge.caching import invalidate_contest_ranking_cache
+                invalidate_contest_ranking_cache(self.contest)
     recompute_results.alters_data = True
 
     def check_ban(self):
