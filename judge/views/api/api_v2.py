@@ -657,42 +657,121 @@ class APISubmissionDetail(APILoginRequiredMixin, APIDetailView):
         hidden_batches = get_hidden_batches_for_problem(submission.problem, is_pretested=submission.is_pretested) \
             if mask_hidden else set()
         is_new_ioi = bool(submission.contest_object and submission.contest_object.format_name == 'new_ioi')
+        grouped_batches = group_test_cases(submission.test_cases.all())[0]
 
-        cases = []
-        for batch in group_test_cases(submission.test_cases.all())[0]:
-            is_hidden_batch = batch['id'] in hidden_batches
-            if is_new_ioi:
-                if batch['id'] is None:
-                    continue
+        if is_new_ioi:
+            payload_batches = []
+            visible_total_score = 0.0
+            visible_total_time = 0.0
+            visible_total_memory = 0.0
 
-                if is_hidden_batch:
-                    cases.append({
-                        'type': 'batch',
+            has_explicit_batches = any(batch['id'] is not None for batch in grouped_batches)
+
+            if has_explicit_batches:
+                for batch in grouped_batches:
+                    if batch['id'] is None:
+                        continue
+
+                    is_hidden_batch = batch['id'] in hidden_batches
+                    failing_case = next(
+                        (
+                            case for case in batch['cases']
+                            if case.status != 'AC' or (case.points is not None and case.total is not None and case.points < case.total)
+                        ),
+                        None,
+                    )
+
+                    batch_score = float(batch['points'] or 0)
+                    batch_total = float(batch['total'] or 0)
+                    batch_time = max((float(case.time or 0) for case in batch['cases']), default=0.0)
+                    batch_memory = max((float(case.memory or 0) for case in batch['cases']), default=0.0)
+                    batch_status = 'Hidden' if is_hidden_batch else (failing_case.status if failing_case is not None else 'AC')
+
+                    payload_batches.append({
                         'batch_id': batch['id'],
-                        'status': 'Hidden',
-                        'points': 0,
-                        'total': 0,
+                        'status': batch_status,
+                        'score': 0 if is_hidden_batch else batch_score,
+                        'time': 0 if is_hidden_batch else batch_time,
+                        'memory': 0 if is_hidden_batch else batch_memory,
+                        'total': 0 if is_hidden_batch else batch_total,
+                        'testcases': [],
                     })
-                    continue
+
+                    if not is_hidden_batch:
+                        visible_total_score += batch_score
+                        visible_total_time = max(visible_total_time, batch_time)
+                        visible_total_memory = max(visible_total_memory, batch_memory)
+            else:
+                flat_cases = []
+                for batch in grouped_batches:
+                    flat_cases.extend(batch['cases'])
 
                 failing_case = next(
                     (
-                        case for case in batch['cases']
+                        case for case in flat_cases
                         if case.status != 'AC' or (case.points is not None and case.total is not None and case.points < case.total)
                     ),
                     None,
                 )
-                status = failing_case.status if failing_case is not None else 'AC'
 
-                cases.append({
-                    'type': 'batch',
-                    'batch_id': batch['id'],
-                    'status': status,
-                    'points': batch['points'],
-                    'total': batch['total'],
+                flat_score = sum(float(case.points or 0) for case in flat_cases)
+                flat_total = sum(float(case.total or 0) for case in flat_cases)
+                flat_time = max((float(case.time or 0) for case in flat_cases), default=0.0)
+                flat_memory = max((float(case.memory or 0) for case in flat_cases), default=0.0)
+
+                flat_hidden = False
+                if mask_hidden:
+                    hidden_flat_queryset = submission.problem.cases.filter(type='C', is_hidden=True)
+                    if submission.is_pretested:
+                        hidden_flat_queryset = hidden_flat_queryset.filter(is_pretest=True)
+                    else:
+                        hidden_flat_queryset = hidden_flat_queryset.filter(is_pretest=False)
+                    flat_hidden = hidden_flat_queryset.exists()
+
+                payload_batches.append({
+                    'batch_id': 1,
+                    'status': 'Hidden' if flat_hidden else (failing_case.status if failing_case is not None else 'AC'),
+                    'score': 0 if flat_hidden else flat_score,
+                    'time': 0 if flat_hidden else flat_time,
+                    'memory': 0 if flat_hidden else flat_memory,
+                    'total': 0 if flat_hidden else flat_total,
+                    'testcases': [],
                 })
-                continue
 
+                if not flat_hidden:
+                    visible_total_score = flat_score
+                    visible_total_time = flat_time
+                    visible_total_memory = flat_memory
+
+            visible_contest_points = None
+            if hasattr(submission, 'contest') and mask_hidden:
+                visible_contest_points = submission.contest.visible_points
+
+            return {
+                'id': submission.id,
+                'problem': submission.problem.code,
+                'user': submission.user.user.username,
+                'date': submission.date.isoformat(),
+                'time': visible_total_time,
+                'memory': visible_total_memory,
+                'points': visible_contest_points if visible_contest_points is not None else submission.points,
+                'language': submission.language.key,
+                'status': submission.status,
+                'result': 'Hidden' if mask_hidden else submission.result,
+                'case_points': visible_total_score,
+                'case_total': submission.case_total,
+                'total_score': visible_total_score,
+                'total_time': visible_total_time,
+                'total_memory': visible_total_memory,
+                'batches': payload_batches,
+                'testcases': [],
+                # Backward-compatible key for older clients.
+                'cases': payload_batches,
+            }
+
+        cases = []
+        for batch in grouped_batches:
+            is_hidden_batch = batch['id'] in hidden_batches
             batch_cases = [
                 {
                     'type': 'case',

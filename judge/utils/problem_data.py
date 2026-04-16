@@ -230,7 +230,6 @@ class ProblemDataCompiler(object):
                     if case.points is None:
                         raise ProblemDataError(_('Points must be defined for non-batch case #%d.') % i)
                     data['is_pretest'] = case.is_pretest
-                    case.is_hidden = False
 
                 if not self.generator:
                     if case.input_file not in self.files:

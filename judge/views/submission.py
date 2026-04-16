@@ -30,7 +30,7 @@ from judge.models import Contest, Language, Organization, Problem, ProblemTransl
 from judge.models.problem import ProblemTestcaseResultAccess, SubmissionSourceAccess
 from judge.utils.infinite_paginator import InfinitePaginationMixin
 from judge.utils.lazy import memo_lazy
-from judge.utils.new_ioi import get_hidden_batches_for_problem, should_mask_submission_hidden_results
+from judge.utils.new_ioi import contest_is_new_ioi, get_hidden_batches_for_problem, should_mask_submission_hidden_results
 from judge.utils.problem_data import get_problem_testcases_data
 from judge.utils.problems import get_result_data, user_completed_ids, user_editable_ids, user_tester_ids
 from judge.utils.raw_sql import join_sql_subquery, use_straight_join
@@ -271,6 +271,63 @@ def mask_new_ioi_hidden_batches(submission, user, batches, statuses):
     return batches, masked_statuses
 
 
+def coerce_new_ioi_flat_testcases_into_pseudo_batch(submission, user, batches, statuses):
+    if not contest_is_new_ioi(submission.contest_object):
+        return batches, statuses
+
+    if any(batch['id'] is not None for batch in batches):
+        return batches, statuses
+
+    flat_cases = []
+    for batch in batches:
+        flat_cases.extend(batch['cases'])
+
+    if not flat_cases:
+        return batches, statuses
+
+    severity = {
+        'AC': 0,
+        'SC': 1,
+        'WA': 2,
+        'IR': 3,
+        'OLE': 4,
+        'MLE': 5,
+        'TLE': 6,
+        'RTE': 7,
+        'CE': 8,
+        'IE': 9,
+    }
+    aggregate_status = max(flat_cases, key=lambda case: severity.get(case.status, 10)).status
+    aggregate_points = sum(float(case.points or 0) for case in flat_cases)
+    aggregate_total = sum(float(case.total or 0) for case in flat_cases)
+
+    is_flat_hidden = False
+    if should_mask_submission_hidden_results(submission, user=user):
+        hidden_flat_cases = submission.problem.cases.filter(type='C', is_hidden=True)
+        if submission.is_pretested:
+            hidden_flat_cases = hidden_flat_cases.filter(is_pretest=True)
+        else:
+            hidden_flat_cases = hidden_flat_cases.filter(is_pretest=False)
+        is_flat_hidden = hidden_flat_cases.exists()
+
+    if is_flat_hidden:
+        aggregate_status = 'HD'
+        aggregate_points = 0
+        aggregate_total = 0
+
+    pseudo_batch = {
+        'id': 1,
+        'cases': flat_cases,
+        'points': aggregate_points,
+        'total': aggregate_total,
+        'status': aggregate_status,
+        'long_status': _('Hidden') if aggregate_status == 'HD' else Submission.USER_DISPLAY_CODES.get(aggregate_status, ''),
+    }
+
+    pseudo_status = TestCase(id=flat_cases[0].id, status=aggregate_status, batch=1, num_combined=1)
+    return [pseudo_batch], [pseudo_status]
+
+
 class SubmissionStatus(SubmissionDetailBase):
     template_name = 'submission/status.html'
 
@@ -284,6 +341,9 @@ class SubmissionStatus(SubmissionDetailBase):
 
         context['batches'], statuses, test_case_count = group_test_cases(submission.test_cases.all())
         context['batches'], statuses = mask_new_ioi_hidden_batches(
+            submission, self.request.user, context['batches'], statuses,
+        )
+        context['batches'], statuses = coerce_new_ioi_flat_testcases_into_pseudo_batch(
             submission, self.request.user, context['batches'], statuses,
         )
 

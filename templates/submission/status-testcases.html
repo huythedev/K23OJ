@@ -36,7 +36,7 @@
     {% set prefix_length = None %}
 {% endif %}
 {% set is_pretest = submission.is_pretested %}
-{% set is_new_ioi_submission = submission.contest_or_none and submission.contest_or_none.format_name == 'new_ioi' %}
+{% set is_new_ioi_submission = submission.contest_object and submission.contest_object.format_name == 'new_ioi' %}
 
 {% if submission.status != 'IE' %}
     {% if submission.status == 'QU' %}
