@@ -1051,7 +1051,10 @@ def get_contest_ranking_list(request, contest, participation=None, ranking_list=
 
             problem_cells = []
             for contest_problem in problems:
-                problem_data = format_data.get(str(contest_problem.id), {})
+                problem_data = format_data.get(str(contest_problem.id))
+                if not problem_data:
+                    problem_cells.append(mark_safe('<td></td>'))
+                    continue
                 points = problem_data.get('admin_points', problem_data.get('points', 0))
                 dt = problem_data.get('admin_time', problem_data.get('time', 0))
                 problem_cells.append(format_html(

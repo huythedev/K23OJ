@@ -234,7 +234,7 @@
                     <b>{{ _('Final score:') }}</b>
                 {% endif %}
                 {% if mask_new_ioi_hidden %}
-                    0/{{ submission.case_total|floatformat(0) }}
+                    {{ new_ioi_visible_case_points|floatformat(-3) }}/{{ new_ioi_visible_case_total|floatformat(0) }}
                 {% else %}
                     {{ submission.case_points|floatformat(-3) }}/{{ submission.case_total|floatformat(0) }}
                 {% endif %}

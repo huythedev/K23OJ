@@ -338,6 +338,8 @@ class SubmissionStatus(SubmissionDetailBase):
         context = super(SubmissionStatus, self).get_context_data(**kwargs)
         submission = self.object
         context['mask_new_ioi_hidden'] = should_mask_submission_hidden_results(submission, self.request.user)
+        context['new_ioi_visible_case_points'] = submission.case_points
+        context['new_ioi_visible_case_total'] = submission.case_total
 
         context['batches'], statuses, test_case_count = group_test_cases(submission.test_cases.all())
         context['batches'], statuses = mask_new_ioi_hidden_batches(
@@ -346,6 +348,20 @@ class SubmissionStatus(SubmissionDetailBase):
         context['batches'], statuses = coerce_new_ioi_flat_testcases_into_pseudo_batch(
             submission, self.request.user, context['batches'], statuses,
         )
+
+        if context['mask_new_ioi_hidden']:
+            visible_points = 0.0
+            visible_total = 0.0
+            for batch in context['batches']:
+                if batch['id'] is None:
+                    for case in batch['cases']:
+                        visible_points += float(case.points or 0)
+                        visible_total += float(case.total or 0)
+                else:
+                    visible_points += float(batch.get('points') or 0)
+                    visible_total += float(batch.get('total') or 0)
+            context['new_ioi_visible_case_points'] = visible_points
+            context['new_ioi_visible_case_total'] = visible_total
 
         context['feedback_limit'] = min(3, test_case_count - 1)
         # In case the submission is in an on-going contest, we don't want to show any feedback.
