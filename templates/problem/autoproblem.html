@@ -62,7 +62,9 @@
             const $uploadProgressText = $('#upload-progress-text');
             const $uploadSizeText = $('#upload-size-text');
             const $uploadSpeedText = $('#upload-speed-text');
-            const $uploadSubmit = $uploadForm.find('input[type="submit"]');
+            const $uploadStatusMessage = $('#upload-status-message');
+            const $uploadLoadingIcon = $('#upload-loading-icon');
+            const $uploadSubmit = $('#autoproblem-upload-button');
 
             function formatBytes(bytes) {
                 if (!bytes) {
@@ -84,25 +86,125 @@
                 $uploadProgressText.text('0%');
                 $uploadSizeText.text('0 B / 0 B');
                 $uploadSpeedText.text('0.00 MB/s');
+                $uploadStatusMessage.text('');
+                $uploadLoadingIcon.hide();
+            }
+
+            function setLoadingState(isLoading) {
+                if (isLoading) {
+                    $uploadLoadingIcon.show();
+                } else {
+                    $uploadLoadingIcon.hide();
+                }
+            }
+
+            function buildTaskStatusUrl(taskId) {
+                const basePath = window.location.pathname.replace(/\/$/, '');
+                return basePath + '/status/' + encodeURIComponent(taskId);
+            }
+
+            function pollUploadTask(taskId) {
+                const statusUrl = buildTaskStatusUrl(taskId);
+                let pollTimer = null;
+                let processingStarted = false;
+
+                function stopPolling() {
+                    if (pollTimer) {
+                        clearInterval(pollTimer);
+                        pollTimer = null;
+                    }
+                }
+
+                async function fetchStatus() {
+                    try {
+                        const response = await fetch(statusUrl, {
+                            method: 'GET',
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                        const taskData = await response.json();
+
+                        if (taskData.state === 'PROGRESS') {
+                            setLoadingState(true);
+                            const current = Number(taskData.current || 0);
+                            const total = Number(taskData.total || 0);
+                            if (total > 0) {
+                                processingStarted = true;
+                                const percent = Math.min(100, Math.floor((current / total) * 100));
+                                $uploadProgressBar.css('background', '#3b82f6');
+                                $uploadProgressBar.css('width', percent + '%');
+                                $uploadProgressText.text(percent + '%');
+                                $uploadSizeText.text(current + ' / ' + total);
+                                $uploadSpeedText.text('--');
+                                $uploadStatusMessage.text(
+                                    'Processing problems: ' + current + ' / ' + total + ' (' + (taskData.message || '') + ')'
+                                );
+                            }
+                        } else if (!processingStarted && taskData.state === 'PENDING') {
+                            setLoadingState(true);
+                            $uploadStatusMessage.text(taskData.message || 'Upload complete! Initializing background processor...');
+                        }
+
+                        if (taskData.state === 'SUCCESS') {
+                            stopPolling();
+                            setLoadingState(false);
+                            $uploadProgressBar.css('width', '100%');
+                            $uploadProgressBar.css('background', '#16a34a');
+                            $uploadProgressText.text('100%');
+                            $uploadSizeText.text('Done');
+                            $uploadStatusMessage.text(taskData.message || 'Upload completed successfully. Redirecting...');
+                            setTimeout(function () {
+                                window.location.href = '?task_id=' + encodeURIComponent(taskId);
+                            }, 1500);
+                            return;
+                        }
+
+                        if (taskData.state === 'FAILURE') {
+                            stopPolling();
+                            setLoadingState(false);
+                            alert(taskData.message || 'Upload failed.');
+                            $uploadSubmit.prop('disabled', false);
+                        }
+                    } catch (error) {
+                        stopPolling();
+                        setLoadingState(false);
+                        alert('Could not fetch upload progress. Please try again.');
+                        $uploadSubmit.prop('disabled', false);
+                    }
+                }
+
+                pollTimer = setInterval(fetchStatus, 1000);
+                fetchStatus();
             }
 
             if ($uploadForm.length) {
                 resetUploadProgress();
 
-                $uploadForm.on('submit', function (e) {
+                async function startUploadFlow(e) {
+                    if (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+
                     const file = $uploadInput[0] && $uploadInput[0].files && $uploadInput[0].files[0];
                     if (!file) {
                         return;
                     }
 
-                    e.preventDefault();
+                    $uploadSubmit.prop('disabled', true);
+                    $uploadProgressPanel.show();
+                    setLoadingState(true);
+                    $uploadProgressBar.css('background', '#4b8b3b');
+                    $uploadProgressBar.css('width', '0%');
+                    $uploadProgressText.text('0%');
+                    $uploadSizeText.text('0 / 0');
+                    $uploadSpeedText.text('--');
+                    $uploadStatusMessage.text('Uploading package...');
 
                     const xhr = new XMLHttpRequest();
                     const formData = new FormData($uploadForm[0]);
                     const startedAt = Date.now();
-
-                    $uploadSubmit.prop('disabled', true);
-                    $uploadProgressPanel.show();
 
                     xhr.upload.addEventListener('progress', function (event) {
                         if (!event.lengthComputable) {
@@ -119,28 +221,44 @@
                         $uploadProgressText.text(percent + '%');
                         $uploadSizeText.text(formatBytes(loaded) + ' / ' + formatBytes(total));
                         $uploadSpeedText.text(speedMBps.toFixed(2) + ' MB/s');
+                        $uploadStatusMessage.text(
+                            'Uploading... ' + formatBytes(loaded) + ' / ' + formatBytes(total) +
+                            ' (' + speedMBps.toFixed(2) + ' MB/s)'
+                        );
                     });
 
                     xhr.addEventListener('load', function () {
-                        if (xhr.status >= 200 && xhr.status < 300) {
-                            document.open();
-                            document.write(xhr.responseText);
-                            document.close();
+                        let payload = null;
+                        try {
+                            payload = JSON.parse(xhr.responseText || '{}');
+                        } catch (parseError) {
+                            payload = {};
+                        }
+
+                        if (xhr.status < 200 || xhr.status >= 300) {
+                            setLoadingState(false);
+                            alert(payload.message || 'Upload failed. Please try again.');
+                            $uploadSubmit.prop('disabled', false);
                             return;
                         }
 
-                        if (xhr.responseText) {
-                            document.open();
-                            document.write(xhr.responseText);
-                            document.close();
+                        if (!payload.task_id) {
+                            setLoadingState(false);
+                            alert('Upload task could not be started.');
+                            $uploadSubmit.prop('disabled', false);
                             return;
                         }
 
-                        alert('Upload failed. Please try again.');
-                        $uploadSubmit.prop('disabled', false);
+                        $uploadProgressBar.css('width', '100%');
+                        $uploadProgressText.text('100%');
+                        $uploadProgressBar.css('background', '#d97706');
+                        $uploadStatusMessage.text('Upload complete! Initializing background processor...');
+                        $uploadSpeedText.text('--');
+                        pollUploadTask(payload.task_id);
                     });
 
                     xhr.addEventListener('error', function () {
+                        setLoadingState(false);
                         alert('Network error while uploading. Please try again.');
                         $uploadSubmit.prop('disabled', false);
                     });
@@ -148,6 +266,13 @@
                     xhr.open('POST', $uploadForm.attr('action') || window.location.href, true);
                     xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
                     xhr.send(formData);
+                }
+
+                $uploadSubmit.on('click', startUploadFlow);
+                $uploadForm.on('submit', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
                 });
             }
 
@@ -164,6 +289,35 @@
                     bindContestForm($contestForms.find('.contest-form-item').last());
                 });
             }
+
+            const selectedProblemCheckboxSelector = 'input[type="checkbox"][name="selected_problems"], input[type="checkbox"][name$="-selected_problems"]';
+            let lastChecked = null;
+
+            document.addEventListener('click', function (e) {
+                const target = e.target;
+                if (!(target instanceof HTMLInputElement) || !target.matches(selectedProblemCheckboxSelector)) {
+                    return;
+                }
+
+                const groupedCheckboxes = Array.from(document.querySelectorAll(selectedProblemCheckboxSelector))
+                    .filter(function (checkbox) {
+                        return checkbox.name === target.name;
+                    });
+
+                if (e.shiftKey && lastChecked && lastChecked.name === target.name) {
+                    const start = groupedCheckboxes.indexOf(lastChecked);
+                    const end = groupedCheckboxes.indexOf(target);
+                    if (start !== -1 && end !== -1) {
+                        const from = Math.min(start, end);
+                        const to = Math.max(start, end);
+                        for (let i = from; i <= to; i += 1) {
+                            groupedCheckboxes[i].checked = target.checked;
+                        }
+                    }
+                }
+
+                lastChecked = target;
+            });
 
             const $contestActionRadios = $('input[name="contest_action_mode"]');
             const $createNewContestSection = $('#create-new-contest-section');
@@ -191,6 +345,25 @@
     {% if add_existing_contest_form %}
         {{ add_existing_contest_form.media.css }}
     {% endif %}
+    <style>
+        .autoproblem-loading-icon {
+            display: inline-block;
+            width: 0.95em;
+            height: 0.95em;
+            margin-right: 0.4em;
+            border: 2px solid #d1d5db;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: autoproblem-spin 0.7s linear infinite;
+            vertical-align: -0.08em;
+        }
+
+        @keyframes autoproblem-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
     <link rel="stylesheet" type="text/css" href="{{ static('ui_form.css') }}">
 {% endblock %}
 
@@ -204,6 +377,10 @@
             <div style="height: 8px; background: #f1f1f1; border-radius: 4px; overflow: hidden;">
                 <div id="upload-progress-bar" style="height: 100%; width: 0%; background: #4b8b3b;"></div>
             </div>
+            <div style="margin-top: 0.5em; font-size: 0.95em;">
+                <span id="upload-loading-icon" class="autoproblem-loading-icon" style="display: none;"></span>
+                <b id="upload-status-message"></b>
+            </div>
             <div style="display: flex; justify-content: space-between; gap: 1em; margin-top: 0.5em; font-size: 0.95em;">
                 <div>{{ _('Progress') }}: <b id="upload-progress-text">0%</b></div>
                 <div>{{ _('Uploaded') }}: <b id="upload-size-text">0 B / 0 B</b></div>
@@ -211,7 +388,9 @@
             </div>
         </div>
         <hr>
-        <div style="display: flex; justify-content: flex-end;"><input type="submit" value="{{ _('Upload') }}" class="button"></div>
+        <div style="display: flex; justify-content: flex-end;">
+            <button id="autoproblem-upload-button" type="button" class="button">{{ _('Upload') }}</button>
+        </div>
     </form>
 
     {% if report %}
