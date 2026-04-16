@@ -74,6 +74,60 @@
                 });
             }
 
+            function setupShiftClickCheckboxRange() {
+                var lastCheckedByGroup = {};
+
+                function getRangeGroup(input) {
+                    if (input.id && input.id.endsWith('-is_hidden')) {
+                        return 'is_hidden';
+                    }
+                    if (input.name && input.name.endsWith('-DELETE')) {
+                        return 'delete';
+                    }
+                    return null;
+                }
+
+                function getGroupCheckboxes(group) {
+                    if (group === 'is_hidden') {
+                        return $table.find('input[type=checkbox]').filter(function () {
+                            return this.id && this.id.endsWith('-is_hidden');
+                        });
+                    }
+                    if (group === 'delete') {
+                        return $table.find('input[type=checkbox]').filter(function () {
+                            return this.name && this.name.endsWith('-DELETE');
+                        });
+                    }
+                    return $();
+                }
+
+                $table.on('click', 'input[type=checkbox]', function (e) {
+                    var group = getRangeGroup(this);
+                    if (!group) {
+                        return;
+                    }
+
+                    var current = this;
+                    var previous = lastCheckedByGroup[group];
+                    if (e.shiftKey && previous && previous !== current) {
+                        var checkboxes = getGroupCheckboxes(group);
+                        var start = checkboxes.index(previous);
+                        var end = checkboxes.index(current);
+
+                        if (start !== -1 && end !== -1) {
+                            var from = Math.min(start, end);
+                            var to = Math.max(start, end);
+                            var checked = current.checked;
+                            checkboxes.slice(from, to + 1).prop('checked', checked);
+                        }
+                    }
+
+                    lastCheckedByGroup[group] = current;
+                });
+            }
+
+            setupShiftClickCheckboxRange();
+
             function try_parse_json(json) {
                 try {
                     return JSON.parse(json);
@@ -880,7 +934,15 @@
                     </td>
                     <td>{{ form.points.errors }}{{ form.points }}</td>
                     <td>{{ form.is_pretest.errors }}{{ form.is_pretest }}</td>
-                    <td>{{ form.is_hidden.errors }}{{ form.is_hidden }}</td>
+                    <td>
+                        {{ form.is_hidden.errors }}
+                        <input
+                            type="checkbox"
+                            name="{{ form['is_hidden'].html_name }}"
+                            id="{{ form['is_hidden'].id_for_label }}"
+                            {% if form['is_hidden'].value() %}checked{% endif %}
+                        >
+                    </td>
                     <td>{{ form.is_sample.errors }}{{ form.is_sample }}</td>
                     <!-- <td class="generator-args">{{ form.generator_args.errors }}{{ form.generator_args }}
                         <a href="javascript:void(0)" class="edit-generator-args">

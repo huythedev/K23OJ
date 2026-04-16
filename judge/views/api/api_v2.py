@@ -656,10 +656,43 @@ class APISubmissionDetail(APILoginRequiredMixin, APIDetailView):
         mask_hidden = should_mask_submission_hidden_results(submission, self.request.user)
         hidden_batches = get_hidden_batches_for_problem(submission.problem, is_pretested=submission.is_pretested) \
             if mask_hidden else set()
+        is_new_ioi = bool(submission.contest_object and submission.contest_object.format_name == 'new_ioi')
 
         cases = []
         for batch in group_test_cases(submission.test_cases.all())[0]:
             is_hidden_batch = batch['id'] in hidden_batches
+            if is_new_ioi:
+                if batch['id'] is None:
+                    continue
+
+                if is_hidden_batch:
+                    cases.append({
+                        'type': 'batch',
+                        'batch_id': batch['id'],
+                        'status': 'Hidden',
+                        'points': 0,
+                        'total': 0,
+                    })
+                    continue
+
+                failing_case = next(
+                    (
+                        case for case in batch['cases']
+                        if case.status != 'AC' or (case.points is not None and case.total is not None and case.points < case.total)
+                    ),
+                    None,
+                )
+                status = failing_case.status if failing_case is not None else 'AC'
+
+                cases.append({
+                    'type': 'batch',
+                    'batch_id': batch['id'],
+                    'status': status,
+                    'points': batch['points'],
+                    'total': batch['total'],
+                })
+                continue
+
             batch_cases = [
                 {
                     'type': 'case',

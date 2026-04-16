@@ -253,6 +253,16 @@ class ProblemDataView(TitleMixin, ProblemManagerMixin):
         data_form.zip_valid = valid_files is not False
         cases_formset = self.get_case_formset(valid_files, post=True)
         if self.check_valid(data_form, cases_formset):
+            for form in cases_formset.forms:
+                if not hasattr(form, 'cleaned_data') or not form.cleaned_data:
+                    continue
+                if form.cleaned_data.get('DELETE'):
+                    continue
+                key = form.add_prefix('is_hidden')
+                is_hidden = request.POST.get(key) in ('on', 'true', '1')
+                form.cleaned_data['is_hidden'] = is_hidden
+                form.instance.is_hidden = is_hidden
+
             data = data_form.save()
             for case in cases_formset.save(commit=False):
                 case.dataset_id = problem.id

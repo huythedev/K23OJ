@@ -63,8 +63,9 @@ class NewIOIContestFormat(LegacyIOIContestFormat):
             state = per_problem.setdefault(
                 key,
                 {
-                    'visible_max': defaultdict(float),
-                    'all_max': defaultdict(float),
+                    # Per-subtask cumulative maxima across all submissions.
+                    'max_visible_subtask_scores': defaultdict(float),
+                    'max_subtask_scores': defaultdict(float),
                     'best_visible': 0.0,
                     'best_admin': 0.0,
                     'best_visible_time': 0,
@@ -90,16 +91,16 @@ class NewIOIContestFormat(LegacyIOIContestFormat):
             for bucket_id, points_list in batch_points.items():
                 bucket_type, bucket_value = bucket_id
                 score = min(points_list)
-                if score > state['all_max'][bucket_id]:
-                    state['all_max'][bucket_id] = score
+                if score > state['max_subtask_scores'][bucket_id]:
+                    state['max_subtask_scores'][bucket_id] = score
 
                 is_hidden_bucket = bucket_type == 'batch' and bucket_value in hidden_batches
-                if not is_hidden_bucket and score > state['visible_max'][bucket_id]:
-                    state['visible_max'][bucket_id] = score
+                if not is_hidden_bucket and score > state['max_visible_subtask_scores'][bucket_id]:
+                    state['max_visible_subtask_scores'][bucket_id] = score
 
             dt = max((contest_submission.submission.date - participation.start).total_seconds(), 0)
-            current_visible = sum(state['visible_max'].values())
-            current_admin = sum(state['all_max'].values())
+            current_visible = sum(state['max_visible_subtask_scores'].values())
+            current_admin = sum(state['max_subtask_scores'].values())
 
             if current_visible > state['best_visible']:
                 state['best_visible'] = current_visible
@@ -112,8 +113,8 @@ class NewIOIContestFormat(LegacyIOIContestFormat):
         format_data = {}
 
         for problem_id, state in per_problem.items():
-            visible_points = sum(state['visible_max'].values())
-            admin_points = sum(state['all_max'].values())
+            visible_points = sum(state['max_visible_subtask_scores'].values())
+            admin_points = sum(state['max_subtask_scores'].values())
             hidden_points = admin_points - visible_points
 
             if live_masking:
@@ -130,6 +131,8 @@ class NewIOIContestFormat(LegacyIOIContestFormat):
                 'hidden_points': hidden_points,
                 'admin_points': admin_points,
                 'admin_time': state['best_admin_time'],
+                'visible_score': visible_points,
+                'final_score': admin_points,
             }
 
             total_effective += effective_points
@@ -147,6 +150,9 @@ class NewIOIContestFormat(LegacyIOIContestFormat):
                                   self.contest.points_precision),
             'admin_total': round(total_admin, self.contest.points_precision),
             'effective_total': round(total_effective, self.contest.points_precision),
+            'visible_score': round(sum(v.get('visible_points', 0) for v in format_data.values() if isinstance(v, dict)),
+                                   self.contest.points_precision),
+            'final_score': round(total_admin, self.contest.points_precision),
             'admin_cumtime': max(cumtime_admin, 0),
             'effective_cumtime': max(cumtime_effective, 0),
             'live_masking': live_masking,
