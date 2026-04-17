@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+from importlib import import_module
 from datetime import date, timedelta
 
 from django.conf import settings
@@ -237,7 +238,22 @@ class Contest(models.Model):
 
     @cached_property
     def format_class(self):
-        return contest_format.formats[self.format_name]
+        format_class = contest_format.formats.get(self.format_name)
+        if format_class is not None:
+            return format_class
+
+        # Fallback: try loading a format module matching the configured key
+        # so decorator-based registration runs before we fail.
+        try:
+            import_module('judge.contest_format.%s' % self.format_name)
+        except Exception:
+            pass
+
+        format_class = contest_format.formats.get(self.format_name)
+        if format_class is not None:
+            return format_class
+
+        raise KeyError(self.format_name)
 
     @cached_property
     def format(self):
