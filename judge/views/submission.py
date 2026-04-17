@@ -2,7 +2,7 @@ import json
 import os
 import zipfile
 import yaml
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from itertools import groupby
 from operator import attrgetter
 
@@ -341,6 +341,7 @@ class SubmissionStatus(SubmissionDetailBase):
         context['can_view_new_ioi_test_details'] = can_view_new_ioi_hidden(submission.contest_object, self.request.user)
         context['new_ioi_visible_case_points'] = submission.case_points
         context['new_ioi_visible_case_total'] = submission.case_total
+        context['new_ioi_visible_earned_points'] = submission.points
 
         context['batches'], statuses, test_case_count = group_test_cases(submission.test_cases.all())
         context['batches'], statuses = mask_new_ioi_hidden_batches(
@@ -351,18 +352,45 @@ class SubmissionStatus(SubmissionDetailBase):
         )
 
         if context['mask_new_ioi_hidden']:
+            hidden_batches = set(get_hidden_batches_for_problem(submission.problem, is_pretested=submission.is_pretested))
+            batch_points = defaultdict(list)
+            visible_total = 0
+            visible_accepted = 0
+
+            for case in submission.test_cases.all():
+                bucket_id = ('case', case.case) if case.batch is None else ('batch', case.batch)
+                if case.points is not None:
+                    batch_points[bucket_id].append(float(case.points))
+
+                is_hidden_bucket = case.batch is not None and case.batch in hidden_batches
+                if is_hidden_bucket:
+                    continue
+
+                visible_total += 1
+                if case.status == 'AC' and float(case.points or 0) >= float(case.total or 0):
+                    visible_accepted += 1
+
             visible_points = 0.0
-            visible_total = 0.0
-            for batch in context['batches']:
-                if batch['id'] is None:
-                    for case in batch['cases']:
-                        visible_points += float(case.points or 0)
-                        visible_total += float(case.total or 0)
-                else:
-                    visible_points += float(batch.get('points') or 0)
-                    visible_total += float(batch.get('total') or 0)
-            context['new_ioi_visible_case_points'] = visible_points
+            for (bucket_type, bucket_value), points_list in batch_points.items():
+                if bucket_type == 'batch' and bucket_value in hidden_batches:
+                    continue
+                visible_points += min(points_list)
+
+            context['new_ioi_visible_case_points'] = visible_accepted
             context['new_ioi_visible_case_total'] = visible_total
+            raw_total = float(submission.case_total or 0)
+            contest_weight = float(submission.problem.points or 0)
+            if hasattr(submission, 'contest') and getattr(submission.contest, 'problem', None) is not None:
+                contest_weight = float(submission.contest.problem.points or contest_weight)
+
+            # Defensive fallback for broken/abnormal raw totals.
+            if raw_total <= 0 or raw_total > 10 ** 7:
+                context['new_ioi_visible_earned_points'] = round(contest_weight, 3)
+            else:
+                try:
+                    context['new_ioi_visible_earned_points'] = round((visible_points / raw_total) * contest_weight, 3)
+                except ZeroDivisionError:
+                    context['new_ioi_visible_earned_points'] = round(contest_weight, 3)
 
         context['feedback_limit'] = min(3, test_case_count - 1)
         # In case the submission is in an on-going contest, we don't want to show any feedback.
@@ -390,7 +418,7 @@ class SubmissionStatus(SubmissionDetailBase):
             submission.problem.allow_view_feedback
         context['time_limit'] = submission.problem.time_limit
         if hasattr(submission, 'contest') and context['mask_new_ioi_hidden']:
-            context['contest_display_points'] = submission.contest.visible_points
+            context['contest_display_points'] = context['new_ioi_visible_earned_points']
         elif hasattr(submission, 'contest'):
             context['contest_display_points'] = submission.contest.points
         else:

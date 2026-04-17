@@ -234,18 +234,22 @@
                 {% else %}
                     <b>{{ _('Final score:') }}</b>
                 {% endif %}
-                {% if mask_new_ioi_hidden %}
-                    {{ new_ioi_visible_case_points|floatformat(-3) }}/{{ new_ioi_visible_case_total|floatformat(0) }}
-                {% else %}
+                {% if not mask_new_ioi_hidden %}
                     {{ submission.case_points|floatformat(-3) }}/{{ submission.case_total|floatformat(0) }}
-                {% endif %}
-                {% if request.in_contest and submission.contest_or_none %}
+                {% elif request.in_contest and submission.contest_or_none %}
                     {% with contest=submission.contest_or_none %}
-                        {% set points=contest_display_points|roundfloat(3) %}
+                        {{ _('%(points)s/%(total)s points', points=new_ioi_visible_earned_points|roundfloat(3), total=contest.problem.points|floatformat(-1)) }}
+                    {% endwith %}
+                {% else %}
+                    {{ _('%(points)s/%(total)s points', points=new_ioi_visible_earned_points|roundfloat(3), total=submission.problem.points|floatformat(3)) }}
+                {% endif %}
+                {% if not mask_new_ioi_hidden and request.in_contest and submission.contest_or_none %}
+                    {% with contest=submission.contest_or_none %}
+                        {% set points=(new_ioi_visible_earned_points if mask_new_ioi_hidden else contest_display_points)|roundfloat(3) %}
                         {% set total=contest.problem.points|floatformat(-1) %}
                         ({{ _('%(points)s/%(total)s points', points=points, total=total) }})
                     {% endwith %}
-                {% else %}
+                {% elif not mask_new_ioi_hidden %}
                     {% with points=submission.points|floatformat(3), total=submission.problem.points|floatformat(3) %}
                         ({{ _('%(points)s/%(total)s points', points=points, total=total) }})
                     {% endwith %}

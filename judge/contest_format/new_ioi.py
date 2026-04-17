@@ -58,7 +58,7 @@ class NewIOIContestFormat(LegacyIOIContestFormat):
         }
 
     @staticmethod
-    def _apply_submission_state(state, contest_submission, hidden_batches, participation_start):
+    def _apply_submission_state(state, contest_submission, hidden_batches, participation_start, score_scale):
         state['has_submission'] = True
         batch_points = defaultdict(list)
 
@@ -66,7 +66,7 @@ class NewIOIContestFormat(LegacyIOIContestFormat):
             if test_case.points is None:
                 continue
             bucket_id = ('case', test_case.case) if test_case.batch is None else ('batch', test_case.batch)
-            batch_points[bucket_id].append(test_case.points)
+            batch_points[bucket_id].append(float(test_case.points) * score_scale)
 
         for bucket_id, points_list in batch_points.items():
             bucket_type, bucket_value = bucket_id
@@ -120,6 +120,11 @@ class NewIOIContestFormat(LegacyIOIContestFormat):
         per_problem = {}
         per_problem_frozen = {}
         hidden_batches_cache = {}
+        # Key by base Problem.id so submission lookups and weight retrieval use the same identifier.
+        contest_weights_by_problem_id = {
+            int(cp.problem_id): float(cp.points or 0)
+            for cp in participation.contest.contest_problems.filter(id__isnull=False)
+        }
 
         submissions = (
             participation.submissions.select_related('problem__problem', 'submission')
@@ -129,8 +134,15 @@ class NewIOIContestFormat(LegacyIOIContestFormat):
 
         for contest_submission in submissions:
             contest_problem_id = contest_submission.problem_id
+            base_problem_id = contest_submission.submission.problem_id
             key = str(contest_problem_id)
             state = per_problem.setdefault(key, self._build_state())
+
+            raw_total = float(contest_submission.submission.case_total or 0)
+            contest_weight = contest_weights_by_problem_id.get(int(base_problem_id))
+            if contest_weight is None:
+                contest_weight = float(contest_submission.problem.points or 0)
+            score_scale = (contest_weight / raw_total) if raw_total > 0 else 0.0
 
             if contest_problem_id not in hidden_batches_cache:
                 hidden_batches_cache[contest_problem_id] = get_hidden_batches_for_problem(
@@ -139,12 +151,14 @@ class NewIOIContestFormat(LegacyIOIContestFormat):
                 )
 
             hidden_batches = hidden_batches_cache[contest_problem_id]
-            self._apply_submission_state(state, contest_submission, hidden_batches, participation.start)
+            self._apply_submission_state(state, contest_submission, hidden_batches, participation.start, score_scale)
 
             if freeze_enabled:
                 frozen_state = per_problem_frozen.setdefault(key, self._build_state())
                 if contest_submission.submission.date < frozen_time:
-                    self._apply_submission_state(frozen_state, contest_submission, hidden_batches, participation.start)
+                    self._apply_submission_state(
+                        frozen_state, contest_submission, hidden_batches, participation.start, score_scale,
+                    )
 
         format_data = {}
 
