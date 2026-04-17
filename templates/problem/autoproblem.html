@@ -66,6 +66,7 @@
             const $uploadLoadingIcon = $('#upload-loading-icon');
             const $uploadRescueButton = $('#upload-rescue-button');
             const $uploadSubmit = $('#autoproblem-upload-button');
+            const $uploadErrorAlert = $('#upload-error-alert');
 
             function formatBytes(bytes) {
                 if (!bytes) {
@@ -84,11 +85,26 @@
             function resetUploadProgress() {
                 $uploadProgressPanel.hide();
                 $uploadProgressBar.css('width', '0%');
+                $uploadProgressBar.css('background', '#4b8b3b');
                 $uploadProgressText.text('0%');
                 $uploadSizeText.text('0 B / 0 B');
                 $uploadSpeedText.text('0.00 MB/s');
                 $uploadStatusMessage.text('');
                 $uploadLoadingIcon.hide();
+                $uploadRescueButton.hide();
+                $uploadErrorAlert.hide().text('');
+            }
+
+            function showUploadError(message) {
+                const safeMessage = message || 'Upload failed.';
+                $uploadProgressPanel.show();
+                $uploadProgressBar.css('background', '#dc3545');
+                if ($uploadProgressBar.width() === 0) {
+                    $uploadProgressBar.css('width', '100%');
+                    $uploadProgressText.text('100%');
+                }
+                $uploadStatusMessage.text(safeMessage);
+                $uploadErrorAlert.text(safeMessage).show();
                 $uploadRescueButton.hide();
             }
 
@@ -187,7 +203,7 @@
                             headers: {
                                 'X-Requested-With': 'XMLHttpRequest'
                             }
-                        });by
+                        });
                         if (!response.ok) {
                             return;
                         }
@@ -298,14 +314,15 @@
                             stopPolling();
                             setLoadingState(false);
                             $uploadRescueButton.hide();
-                            alert(taskData.message || 'Upload failed.');
+                            showUploadError(taskData.message || 'Upload failed.');
                             $uploadSubmit.prop('disabled', false);
+                            return;
                         }
                     } catch (error) {
                         stopPolling();
                         setLoadingState(false);
                         $uploadRescueButton.hide();
-                        alert('Could not fetch upload progress. Please try again.');
+                        showUploadError('Could not fetch upload progress. Please try again.');
                         $uploadSubmit.prop('disabled', false);
                     }
                 }
@@ -337,6 +354,7 @@
                     $uploadSizeText.text('0 / 0');
                     $uploadSpeedText.text('--');
                     $uploadStatusMessage.text('Uploading package...');
+                    $uploadErrorAlert.hide().text('');
 
                     const xhr = new XMLHttpRequest();
                     const formData = new FormData($uploadForm[0]);
@@ -512,6 +530,7 @@
         {% csrf_token %}
         <input type="hidden" name="form_action" value="upload">
         <table class="django-as-table">{{ form.as_table() }}</table>
+        <div id="upload-error-alert" class="alert alert-danger" style="display: none; margin-top: 0.8em;"></div>
         <div id="upload-progress-panel" style="display: none; margin-top: 0.8em; border: 1px solid #ddd; border-radius: 6px; padding: 0.7em;">
             <div style="height: 8px; background: #f1f1f1; border-radius: 4px; overflow: hidden;">
                 <div id="upload-progress-bar" style="height: 100%; width: 0%; background: #4b8b3b;"></div>

@@ -7,6 +7,7 @@ import shutil
 import threading
 import tempfile
 import time
+import traceback
 import uuid
 import zipfile
 from datetime import timedelta
@@ -763,6 +764,45 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
         except OSError:
             pass
 
+    def raise_phase1_validation_error(message):
+        raise ValueError(message)
+
+    def validate_phase1_package(markdown_paths, valid_member_names, target_organization):
+        if not markdown_paths:
+            raise_phase1_validation_error(_('Error: No valid .md files found. Check your ZIP structure.'))
+
+        for markdown_path in markdown_paths:
+            markdown_filename = posixpath.basename(markdown_path)
+            markdown_stem = posixpath.splitext(markdown_filename)[0]
+            markdown_dir = posixpath.dirname(markdown_path)
+            folder_label = markdown_dir or markdown_stem or markdown_filename
+
+            sanitized_code = ProblemAutoProblem._sanitize_problem_code(markdown_filename)
+            problem_code = build_problem_code(target_organization, sanitized_code)
+
+            missing_keys = []
+            if not sanitized_code or not problem_code:
+                missing_keys.append('problem_code')
+
+            testcase_candidates = get_testcase_archive_candidates(markdown_stem, sanitized_code, problem_code)
+            testcase_exists = False
+            for candidate_archive in testcase_candidates:
+                candidate_path = posixpath.join(markdown_dir, candidate_archive) if markdown_dir else candidate_archive
+                if candidate_path in valid_member_names:
+                    testcase_exists = True
+                    break
+
+            if not testcase_exists:
+                missing_keys.append('testcase_archive')
+
+            if missing_keys:
+                raise_phase1_validation_error(
+                    _('Error in problem folder "%(folder)s": missing required metadata keys: %(keys)s.') % {
+                        'folder': folder_label,
+                        'keys': ', '.join(missing_keys),
+                    }
+                )
+
     upload_tmp_dir = os.path.dirname(zip_file_path)
 
     try:
@@ -797,6 +837,7 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                     [name for name in valid_member_names if name.lower().endswith('.md')],
                     key=ProblemAutoProblem._natural_sort_key,
                 )
+                validate_phase1_package(markdown_paths, valid_member_names, target_organization)
 
                 allowed_languages = list(Language.objects.filter(include_in_problem=True))
                 candidate_codes = []
@@ -1090,7 +1131,19 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
 
     except Exception as e:
         autoproblem_logger.exception('Autoproblem thread %s failed', task_id)
-        set_task_state('FAILURE', message=str(e), error=str(e))
+        traceback.print_exc()
+        cache.set(
+            task_id,
+            {
+                'state': 'FAILURE',
+                'current': 0,
+                'total': 0,
+                'message': str(e),
+                'owner_id': user_id,
+                'error': str(e),
+            },
+            timeout=3600,
+        )
     finally:
         close_old_connections()
         if upload_tmp_dir and os.path.isdir(upload_tmp_dir):
@@ -1108,6 +1161,8 @@ def autoproblem_task_status(request, task_id):
         return JsonResponse({'state': 'FAILURE', 'message': _('You are not allowed to access this task.')}, status=403)
 
     response_payload = {key: value for key, value in task.items() if key != 'owner_id'}
+    if response_payload.get('state') == 'FAILURE' and not response_payload.get('message'):
+        response_payload['message'] = response_payload.get('error') or _('Upload failed.')
     if response_payload.get('state') == 'SUCCESS':
         response_payload['redirect_url'] = '%s?task_id=%s' % (reverse('problem_autoproblem'), task_key)
     return JsonResponse(response_payload)
