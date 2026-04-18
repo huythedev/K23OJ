@@ -361,6 +361,7 @@ else:
                     'model': 'judge.Contest',
                     'icon': 'fa-bar-chart',
                     'children': [
+                        'judge.ContestCategory',
                         'judge.ContestParticipation',
                         'judge.ContestTag',
                     ],

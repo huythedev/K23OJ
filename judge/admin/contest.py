@@ -14,7 +14,8 @@ from django.utils.translation import gettext_lazy as _, ngettext
 from django.views.decorators.http import require_POST
 from reversion.admin import VersionAdmin
 
-from judge.models import Contest, ContestAnnouncement, ContestProblem, ContestSubmission, Profile, Rating, Submission
+from judge.models import Contest, ContestAnnouncement, ContestCategory, ContestProblem, ContestSubmission, Profile, \
+    Rating, Submission
 from judge.ratings import rate_contest
 from judge.utils.views import NoBatchDeleteMixin
 from judge.widgets import AdminAceWidget, AdminHeavySelect2MultipleWidget, AdminHeavySelect2Widget, \
@@ -54,6 +55,19 @@ class ContestTagAdmin(admin.ModelAdmin):
         if obj is not None:
             form.base_fields['contests'].initial = obj.contests.all()
         return form
+
+
+class ContestCategoryAdmin(admin.ModelAdmin):
+    fields = ('name', 'slug', 'description', 'parent', 'contests', 'created_by')
+    list_display = ('name', 'slug', 'parent', 'updated_at', 'created_by')
+    search_fields = ('name', 'slug')
+    filter_horizontal = ('contests',)
+    readonly_fields = ('created_by',)
+
+    def save_model(self, request, obj, form, change):
+        if not change and obj.created_by_id is None and hasattr(request.user, 'profile'):
+            obj.created_by = request.user.profile
+        super(ContestCategoryAdmin, self).save_model(request, obj, form, change)
 
 
 class ContestProblemInlineForm(ModelForm):
