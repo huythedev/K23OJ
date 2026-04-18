@@ -659,6 +659,7 @@ MARTOR_SEARCH_USERS_URL = '/widgets/martor/search-user'
 MARTOR_UPLOAD_URL = '/widgets/martor/upload-image'
 MARTOR_MARKDOWN_BASE_MENTION_URL = '/user/'
 MARTOR_UPLOAD_URL_PREFIX = '/martor'
+MARTOR_UPLOAD_TYPE = 'django'
 
 # Directory under MEDIA_ROOT to use to store image uploaded through martor.
 MARTOR_UPLOAD_MEDIA_DIR = 'martor'
@@ -800,6 +801,8 @@ except IOError:
 # Keep upload temp path deployment-agnostic by deriving from MEDIA_ROOT.
 if not globals().get('MEDIA_ROOT'):
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+if not globals().get('MEDIA_URL'):
+    MEDIA_URL = '/media/'
 FILE_UPLOAD_TEMP_DIR = os.path.join(MEDIA_ROOT, 'upload_tmp')
 os.makedirs(FILE_UPLOAD_TEMP_DIR, exist_ok=True)
 

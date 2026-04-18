@@ -1,4 +1,3 @@
-import json
 import os
 import uuid
 from urllib.parse import urljoin
@@ -6,7 +5,7 @@ from urllib.parse import urljoin
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.files.storage import default_storage
-from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, \
+from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse, \
     HttpResponseRedirect
 from django.views.decorators.http import require_POST
 
@@ -47,7 +46,7 @@ def django_uploader(image):
                        urljoin(settings.MEDIA_URL, settings.MARTOR_UPLOAD_MEDIA_DIR))
     if not url_base.endswith('/'):
         url_base += '/'
-    return json.dumps({'status': 200, 'name': '', 'link': urljoin(url_base, name)})
+    return {'status': 200, 'name': '', 'link': urljoin(url_base, name)}
 
 
 def pdf_statement_uploader(statement):
@@ -77,15 +76,19 @@ def submission_uploader(submission_file, problem_code, user_id):
 
 @login_required
 def martor_image_uploader(request):
-    if request.method != 'POST' or 'markdown-image-upload' not in request.FILES:
-        return HttpResponseBadRequest('Invalid request')
+    try:
+        if request.method != 'POST' or 'markdown-image-upload' not in request.FILES:
+            return JsonResponse({'status': 400, 'error': 'Invalid request'})
 
-    image = request.FILES['markdown-image-upload']
-    if request.user.is_staff or request.user.has_perm('judge.can_upload_image'):
-        data = django_uploader(image)
-    else:
-        data = imgur_uploader(image)
-    return HttpResponse(data, content_type='application/json')
+        image = request.FILES['markdown-image-upload']
+        upload_type = getattr(settings, 'MARTOR_UPLOAD_TYPE', 'imgur').lower()
+        if upload_type == 'django' or request.user.is_staff or request.user.has_perm('judge.can_upload_image'):
+            return JsonResponse(django_uploader(image))
+
+        # Preserve existing non-django fallback behavior for deployments still using Imgur.
+        return HttpResponse(imgur_uploader(image), content_type='application/json')
+    except Exception as e:
+        return JsonResponse({'status': 400, 'error': str(e)})
 
 
 def csrf_failure(request: HttpRequest, reason=''):
