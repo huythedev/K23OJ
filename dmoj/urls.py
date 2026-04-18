@@ -241,7 +241,7 @@ urlpatterns = [
     path('contests.ics', contests.ContestICal.as_view(), name='contest_ical'),
     path('contests/<int:year>/<int:month>/', contests.ContestCalendar.as_view(), name='contest_calendar'),
     path('contests/new', contests.CreateContest.as_view(), name='contest_new'),
-    path('category', include([
+    path('contests/category', include([
         path('', contests.ContestCategoryList.as_view(), name='contest_category_list_create'),
         path('/create', contests.ContestCategoryCreate.as_view(), name='contest_category_create'),
         path('/<slug:slug>/edit', contests.ContestCategoryEdit.as_view(), name='contest_category_edit'),
