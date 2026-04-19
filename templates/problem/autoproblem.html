@@ -544,6 +544,9 @@
         {% csrf_token %}
         <input type="hidden" name="form_action" value="upload">
         <table class="django-as-table">{{ form.as_table() }}</table>
+        <p style="margin-top: 0.3em; color: #475569; font-size: 0.95em;">
+            {{ _('You can now upload <Problem_Code>.pdf instead of (or alongside) <Problem_Code>.md. If a PDF is provided, it will be used as the official problem statement.') }}
+        </p>
         <div id="upload-error-alert" class="alert alert-danger" style="display: none; margin-top: 0.8em;"></div>
         <div id="upload-progress-panel" style="display: none; margin-top: 0.8em; border: 1px solid #ddd; border-radius: 6px; padding: 0.7em;">
             <div style="height: 8px; background: #f1f1f1; border-radius: 4px; overflow: hidden;">
@@ -582,7 +585,7 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>{{ _('Markdown file') }}</th>
+                            <th>{{ _('Source file') }}</th>
                             <th>{{ _('Problem code') }}</th>
                             <th>{{ _('Problem name') }}</th>
                             <th>{{ _('Status') }}</th>
@@ -732,7 +735,7 @@
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>{{ _('Markdown file') }}</th>
+                            <th>{{ _('Source file') }}</th>
                             <th>{{ _('Problem code') }}</th>    
                             <th>{{ _('Reason') }}</th>
                         </tr>

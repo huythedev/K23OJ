@@ -767,27 +767,28 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
     def raise_phase1_validation_error(message):
         raise ValueError(message)
 
-    def validate_phase1_package(markdown_paths, valid_member_names, target_organization):
-        if not markdown_paths:
-            raise_phase1_validation_error(_('Error: No valid .md files found. Check your ZIP structure.'))
+    def validate_phase1_package(statement_entries, valid_member_names, target_organization):
+        if not statement_entries:
+            raise_phase1_validation_error(_('Error: No valid .md or .pdf statement files found. Check your ZIP structure.'))
 
-        for markdown_path in markdown_paths:
-            markdown_filename = posixpath.basename(markdown_path)
-            markdown_stem = posixpath.splitext(markdown_filename)[0]
-            markdown_dir = posixpath.dirname(markdown_path)
-            folder_label = markdown_dir or markdown_stem or markdown_filename
+        for statement_entry in statement_entries:
+            statement_path = statement_entry.get('pdf_path') or statement_entry.get('markdown_path')
+            statement_filename = posixpath.basename(statement_path) if statement_path else statement_entry.get('stem', '')
+            statement_stem = statement_entry.get('stem', '')
+            statement_dir = statement_entry.get('dir', '')
+            folder_label = statement_dir or statement_stem or statement_filename
 
-            sanitized_code = ProblemAutoProblem._sanitize_problem_code(markdown_filename)
+            sanitized_code = ProblemAutoProblem._sanitize_problem_code('%s.md' % statement_stem)
             problem_code = build_problem_code(target_organization, sanitized_code)
 
             missing_keys = []
             if not sanitized_code or not problem_code:
                 missing_keys.append('problem_code')
 
-            testcase_candidates = get_testcase_archive_candidates(markdown_stem, sanitized_code, problem_code)
+            testcase_candidates = get_testcase_archive_candidates(statement_stem, sanitized_code, problem_code)
             testcase_exists = False
             for candidate_archive in testcase_candidates:
-                candidate_path = posixpath.join(markdown_dir, candidate_archive) if markdown_dir else candidate_archive
+                candidate_path = posixpath.join(statement_dir, candidate_archive) if statement_dir else candidate_archive
                 if candidate_path in valid_member_names:
                     testcase_exists = True
                     break
@@ -833,17 +834,13 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                     member_name_map[normalized_name] = member
 
                 valid_member_names = set(ProblemAutoProblem._filter_valid_archive_files(list(member_name_map.keys())))
-                markdown_paths = sorted(
-                    [name for name in valid_member_names if name.lower().endswith('.md')],
-                    key=ProblemAutoProblem._natural_sort_key,
-                )
-                validate_phase1_package(markdown_paths, valid_member_names, target_organization)
+                statement_entries = ProblemAutoProblem._collect_statement_entries(valid_member_names)
+                validate_phase1_package(statement_entries, valid_member_names, target_organization)
 
                 allowed_languages = list(Language.objects.filter(include_in_problem=True))
                 candidate_codes = []
-                for markdown_path in markdown_paths:
-                    markdown_filename = posixpath.basename(markdown_path)
-                    sanitized_code = ProblemAutoProblem._sanitize_problem_code(markdown_filename)
+                for statement_entry in statement_entries:
+                    sanitized_code = ProblemAutoProblem._sanitize_problem_code('%s.md' % statement_entry['stem'])
                     problem_code = build_problem_code(target_organization, sanitized_code)
                     if problem_code:
                         candidate_codes.append(problem_code)
@@ -853,25 +850,28 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                 )
                 seen_codes = set()
 
-                for index, markdown_path in enumerate(markdown_paths, start=1):
-                    markdown_filename = posixpath.basename(markdown_path)
-                    markdown_stem = posixpath.splitext(markdown_filename)[0]
-                    sanitized_code = ProblemAutoProblem._sanitize_problem_code(markdown_filename)
+                for index, statement_entry in enumerate(statement_entries, start=1):
+                    markdown_path = statement_entry.get('markdown_path')
+                    pdf_path = statement_entry.get('pdf_path')
+                    statement_path = pdf_path or markdown_path
+                    statement_filename = posixpath.basename(statement_path) if statement_path else '%s.md' % statement_entry['stem']
+                    markdown_stem = statement_entry['stem']
+                    sanitized_code = ProblemAutoProblem._sanitize_problem_code('%s.md' % markdown_stem)
                     problem_code = build_problem_code(target_organization, sanitized_code)
-                    markdown_dir = posixpath.dirname(markdown_path)
+                    markdown_dir = statement_entry.get('dir', '')
 
                     if not problem_code:
                         reason = _('Filename produced an empty problem code after sanitization.')
-                        report['skipped'].append({'file': markdown_filename, 'reason': reason})
-                        autoproblem_logger.warning('Skipping markdown file %s: empty sanitized code', markdown_filename)
+                        report['skipped'].append({'file': statement_filename, 'reason': reason})
+                        autoproblem_logger.warning('Skipping statement file %s: empty sanitized code', statement_filename)
                         continue
 
                     if problem_code in seen_codes:
                         reason = _('Duplicate sanitized code inside upload package.')
-                        report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                        report['skipped'].append({'file': statement_filename, 'code': problem_code, 'reason': reason})
                         autoproblem_logger.warning(
-                            'Skipping markdown file %s: duplicate sanitized code %s inside package',
-                            markdown_filename,
+                            'Skipping statement file %s: duplicate sanitized code %s inside package',
+                            statement_filename,
                             problem_code,
                         )
                         continue
@@ -879,10 +879,10 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
 
                     if problem_code in existing_problem_codes:
                         reason = _('Problem code already exists in database.')
-                        report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                        report['skipped'].append({'file': statement_filename, 'code': problem_code, 'reason': reason})
                         autoproblem_logger.warning(
-                            'Skipping markdown file %s: code %s already exists',
-                            markdown_filename,
+                            'Skipping statement file %s: code %s already exists',
+                            statement_filename,
                             problem_code,
                         )
                         continue
@@ -911,10 +911,10 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                         reason = _('Missing testcase archive %(archive)s in the same directory.') % {
                             'archive': expected_archive,
                         }
-                        report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                        report['skipped'].append({'file': statement_filename, 'code': problem_code, 'reason': reason})
                         autoproblem_logger.warning(
-                            'Skipping markdown file %s: testcase archive %s missing',
-                            markdown_filename,
+                            'Skipping statement file %s: testcase archive %s missing',
+                            statement_filename,
                             expected_archive,
                         )
                         continue
@@ -932,10 +932,10 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                         reason = _('Invalid testcase archive %(archive)s.') % {
                             'archive': testcase_archive,
                         }
-                        report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                        report['skipped'].append({'file': statement_filename, 'code': problem_code, 'reason': reason})
                         autoproblem_logger.warning(
-                            'Skipping markdown file %s: invalid testcase archive %s',
-                            markdown_filename,
+                            'Skipping statement file %s: invalid testcase archive %s',
+                            statement_filename,
                             testcase_archive,
                         )
                         continue
@@ -945,10 +945,10 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                         reason = _('Could not detect matching input/output testcase pairs in %(archive)s.') % {
                             'archive': testcase_archive,
                         }
-                        report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                        report['skipped'].append({'file': statement_filename, 'code': problem_code, 'reason': reason})
                         autoproblem_logger.warning(
-                            'Skipping markdown file %s: no recognizable testcase pairs in %s',
-                            markdown_filename,
+                            'Skipping statement file %s: no recognizable testcase pairs in %s',
+                            statement_filename,
                             testcase_archive,
                         )
                         continue
@@ -963,15 +963,31 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                             shutil.copyfileobj(checker_stream, checker_stage_file, length=copy_buffer_size)
                         checker_storage_name = '%s/%s' % (problem_code, checker_filename)
 
-                    with archive.open(member_name_map[markdown_path], 'r') as statement_file:
-                        markdown_content = statement_file.read().decode('utf-8-sig', errors='replace')
+                    markdown_content = ''
+                    if markdown_path:
+                        with archive.open(member_name_map[markdown_path], 'r') as markdown_statement_file:
+                            markdown_content = markdown_statement_file.read().decode('utf-8-sig', errors='replace')
+
                     problem_name, problem_statement = ProblemAutoProblem._parse_markdown_statement(markdown_content, problem_code)
 
+                    pdf_stage_path = None
+                    pdf_filename = None
+                    if pdf_path:
+                        pdf_filename = posixpath.basename(pdf_path)
+                        pdf_stage_path = os.path.join(staging_dir, '%05d_%s' % (index, pdf_filename))
+                        with archive.open(member_name_map[pdf_path], 'r') as pdf_stream, \
+                                open(pdf_stage_path, 'wb') as pdf_stage_file:
+                            shutil.copyfileobj(pdf_stream, pdf_stage_file, length=copy_buffer_size)
+                        ProblemAutoProblem._validate_pdf_stage_file(pdf_stage_path, pdf_filename)
+
                     prepared_problems.append({
-                        'file': markdown_filename,
+                        'file': statement_filename,
                         'code': problem_code,
                         'name': problem_name,
                         'statement': problem_statement,
+                        'has_pdf_statement': bool(pdf_stage_path),
+                        'pdf_stage_path': pdf_stage_path,
+                        'pdf_filename': pdf_filename,
                         'testcase_pairs': testcase_pairs,
                         'testcase_valid_files': valid_files,
                         'testcase_stage_path': testcase_stage_path,
@@ -1070,11 +1086,22 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                     'PROGRESS',
                     current=index,
                     total=total_generation,
-                    message='Generating testcases for %s...' % created_problem['problem'].code,
+                    message=(
+                        'Processing PDF statement for %s...'
+                        if created_problem.get('has_pdf_statement')
+                        else 'Generating testcases for %s...'
+                    ) % created_problem['problem'].code,
                 )
                 time.sleep(0.1)
 
                 try:
+                    if created_problem.get('pdf_stage_path'):
+                        with open(created_problem['pdf_stage_path'], 'rb') as pdf_statement_file:
+                            created_problem['problem'].pdf_url = pdf_statement_uploader(
+                                File(pdf_statement_file, name=created_problem.get('pdf_filename'))
+                            )
+                        created_problem['problem'].save(update_fields=('pdf_url',))
+
                     move_staged_file_to_storage(
                         created_problem['testcase_stage_path'],
                         created_problem['testcase_storage_name'],
@@ -1672,6 +1699,57 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
             return problem_name, statement
 
         return problem_code, markdown_content
+
+    @classmethod
+    def _collect_statement_entries(cls, valid_member_names):
+        entries = {}
+        for member_name in sorted(valid_member_names, key=cls._natural_sort_key):
+            lowered_name = member_name.lower()
+            if not (lowered_name.endswith('.md') or lowered_name.endswith('.pdf')):
+                continue
+
+            member_dir = posixpath.dirname(member_name)
+            member_filename = posixpath.basename(member_name)
+            member_stem, member_ext = posixpath.splitext(member_filename)
+            statement_key = (member_dir, member_stem.lower())
+
+            if statement_key not in entries:
+                entries[statement_key] = {
+                    'dir': member_dir,
+                    'stem': member_stem,
+                    'markdown_path': None,
+                    'pdf_path': None,
+                }
+
+            if member_ext.lower() == '.md' and entries[statement_key]['markdown_path'] is None:
+                entries[statement_key]['markdown_path'] = member_name
+            if member_ext.lower() == '.pdf' and entries[statement_key]['pdf_path'] is None:
+                entries[statement_key]['pdf_path'] = member_name
+
+        return sorted(
+            entries.values(),
+            key=lambda item: cls._natural_sort_key(cls._join_archive_path(item['dir'], item['stem'])),
+        )
+
+    @staticmethod
+    def _validate_pdf_stage_file(staged_path, filename):
+        file_size = os.path.getsize(staged_path)
+        if file_size > settings.PDF_STATEMENT_MAX_FILE_SIZE:
+            raise ValueError(_('PDF statement %(filename)s exceeds the maximum allowed size.') % {
+                'filename': filename,
+            })
+
+        with open(staged_path, 'rb') as pdf_file:
+            header = pdf_file.read(5)
+            if header != b'%PDF-':
+                raise ValueError(_('Invalid PDF statement file %(filename)s.') % {'filename': filename})
+
+            if file_size > 0:
+                tail_window = min(file_size, 2048)
+                pdf_file.seek(-tail_window, os.SEEK_END)
+                tail = pdf_file.read(tail_window)
+                if b'%%EOF' not in tail:
+                    raise ValueError(_('Invalid PDF statement file %(filename)s.') % {'filename': filename})
 
     @staticmethod
     def _natural_sort_key(path):
@@ -2350,16 +2428,15 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                         member_name_map[normalized_name] = member
 
                     valid_member_names = set(self._filter_valid_archive_files(list(member_name_map.keys())))
-                    markdown_paths = sorted(
-                        [name for name in valid_member_names if name.lower().endswith('.md')],
-                        key=self._natural_sort_key,
-                    )
+                    statement_entries = self._collect_statement_entries(valid_member_names)
+
+                    if not statement_entries:
+                        raise ValueError(_('Error: No valid .md or .pdf statement files found. Check your ZIP structure.'))
 
                     allowed_languages = list(Language.objects.filter(include_in_problem=True))
                     candidate_codes = []
-                    for markdown_path in markdown_paths:
-                        markdown_filename = posixpath.basename(markdown_path)
-                        sanitized_code = self._sanitize_problem_code(markdown_filename)
+                    for statement_entry in statement_entries:
+                        sanitized_code = self._sanitize_problem_code('%s.md' % statement_entry['stem'])
                         problem_code = self.build_problem_code(sanitized_code)
                         if problem_code:
                             candidate_codes.append(problem_code)
@@ -2369,25 +2446,28 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                     )
                     seen_codes = set()
 
-                    for index, markdown_path in enumerate(markdown_paths, start=1):
-                        markdown_filename = posixpath.basename(markdown_path)
-                        markdown_stem = posixpath.splitext(markdown_filename)[0]
-                        sanitized_code = self._sanitize_problem_code(markdown_filename)
+                    for index, statement_entry in enumerate(statement_entries, start=1):
+                        markdown_path = statement_entry.get('markdown_path')
+                        pdf_path = statement_entry.get('pdf_path')
+                        statement_path = pdf_path or markdown_path
+                        statement_filename = posixpath.basename(statement_path) if statement_path else '%s.md' % statement_entry['stem']
+                        markdown_stem = statement_entry['stem']
+                        sanitized_code = self._sanitize_problem_code('%s.md' % markdown_stem)
                         problem_code = self.build_problem_code(sanitized_code)
-                        markdown_dir = posixpath.dirname(markdown_path)
+                        markdown_dir = statement_entry.get('dir', '')
 
                         if not problem_code:
                             reason = _('Filename produced an empty problem code after sanitization.')
-                            report['skipped'].append({'file': markdown_filename, 'reason': reason})
-                            autoproblem_logger.warning('Skipping markdown file %s: empty sanitized code', markdown_filename)
+                            report['skipped'].append({'file': statement_filename, 'reason': reason})
+                            autoproblem_logger.warning('Skipping statement file %s: empty sanitized code', statement_filename)
                             continue
 
                         if problem_code in seen_codes:
                             reason = _('Duplicate sanitized code inside upload package.')
-                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                            report['skipped'].append({'file': statement_filename, 'code': problem_code, 'reason': reason})
                             autoproblem_logger.warning(
-                                'Skipping markdown file %s: duplicate sanitized code %s inside package',
-                                markdown_filename,
+                                'Skipping statement file %s: duplicate sanitized code %s inside package',
+                                statement_filename,
                                 problem_code,
                             )
                             continue
@@ -2395,10 +2475,10 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
 
                         if problem_code in existing_problem_codes:
                             reason = _('Problem code already exists in database.')
-                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                            report['skipped'].append({'file': statement_filename, 'code': problem_code, 'reason': reason})
                             autoproblem_logger.warning(
-                                'Skipping markdown file %s: code %s already exists',
-                                markdown_filename,
+                                'Skipping statement file %s: code %s already exists',
+                                statement_filename,
                                 problem_code,
                             )
                             continue
@@ -2427,10 +2507,10 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                             reason = _('Missing testcase archive %(archive)s in the same directory.') % {
                                 'archive': expected_archive,
                             }
-                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                            report['skipped'].append({'file': statement_filename, 'code': problem_code, 'reason': reason})
                             autoproblem_logger.warning(
-                                'Skipping markdown file %s: testcase archive %s missing',
-                                markdown_filename,
+                                'Skipping statement file %s: testcase archive %s missing',
+                                statement_filename,
                                 expected_archive,
                             )
                             continue
@@ -2448,10 +2528,10 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                             reason = _('Invalid testcase archive %(archive)s.') % {
                                 'archive': testcase_archive,
                             }
-                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                            report['skipped'].append({'file': statement_filename, 'code': problem_code, 'reason': reason})
                             autoproblem_logger.warning(
-                                'Skipping markdown file %s: invalid testcase archive %s',
-                                markdown_filename,
+                                'Skipping statement file %s: invalid testcase archive %s',
+                                statement_filename,
                                 testcase_archive,
                             )
                             continue
@@ -2461,10 +2541,10 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                             reason = _('Could not detect matching input/output testcase pairs in %(archive)s.') % {
                                 'archive': testcase_archive,
                             }
-                            report['skipped'].append({'file': markdown_filename, 'code': problem_code, 'reason': reason})
+                            report['skipped'].append({'file': statement_filename, 'code': problem_code, 'reason': reason})
                             autoproblem_logger.warning(
-                                'Skipping markdown file %s: no recognizable testcase pairs in %s',
-                                markdown_filename,
+                                'Skipping statement file %s: no recognizable testcase pairs in %s',
+                                statement_filename,
                                 testcase_archive,
                             )
                             continue
@@ -2479,15 +2559,31 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                                 shutil.copyfileobj(checker_stream, checker_stage_file, length=copy_buffer_size)
                             checker_storage_name = '%s/%s' % (problem_code, checker_filename)
 
-                        with archive.open(member_name_map[markdown_path], 'r') as statement_file:
-                            markdown_content = statement_file.read().decode('utf-8-sig', errors='replace')
+                        markdown_content = ''
+                        if markdown_path:
+                            with archive.open(member_name_map[markdown_path], 'r') as markdown_statement_file:
+                                markdown_content = markdown_statement_file.read().decode('utf-8-sig', errors='replace')
+
                         problem_name, problem_statement = self._parse_markdown_statement(markdown_content, problem_code)
 
+                        pdf_stage_path = None
+                        pdf_filename = None
+                        if pdf_path:
+                            pdf_filename = posixpath.basename(pdf_path)
+                            pdf_stage_path = os.path.join(staging_dir, '%05d_%s' % (index, pdf_filename))
+                            with archive.open(member_name_map[pdf_path], 'r') as pdf_stream, \
+                                    open(pdf_stage_path, 'wb') as pdf_stage_file:
+                                shutil.copyfileobj(pdf_stream, pdf_stage_file, length=copy_buffer_size)
+                            self._validate_pdf_stage_file(pdf_stage_path, pdf_filename)
+
                         prepared_problems.append({
-                            'file': markdown_filename,
+                            'file': statement_filename,
                             'code': problem_code,
                             'name': problem_name,
                             'statement': problem_statement,
+                            'has_pdf_statement': bool(pdf_stage_path),
+                            'pdf_stage_path': pdf_stage_path,
+                            'pdf_filename': pdf_filename,
                             'testcase_pairs': testcase_pairs,
                             'testcase_valid_files': valid_files,
                             'testcase_stage_path': testcase_stage_path,
@@ -2568,6 +2664,13 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                         })
 
                 for created_problem in created_problem_payloads:
+                    if created_problem.get('pdf_stage_path'):
+                        with open(created_problem['pdf_stage_path'], 'rb') as pdf_statement_file:
+                            created_problem['problem'].pdf_url = pdf_statement_uploader(
+                                File(pdf_statement_file, name=created_problem.get('pdf_filename'))
+                            )
+                        created_problem['problem'].save(update_fields=('pdf_url',))
+
                     with open(created_problem['testcase_stage_path'], 'rb') as testcase_file:
                         problem_data_storage.save(created_problem['testcase_storage_name'], File(testcase_file))
 

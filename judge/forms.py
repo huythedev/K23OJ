@@ -292,6 +292,7 @@ class ProblemAutoProblemForm(Form):
     package = forms.FileField(
         label=_('Package'),
         validators=[FileExtensionValidator(allowed_extensions=['zip'])],
+        help_text=_('Inside the ZIP, each problem can include <Problem_Code>.md and/or <Problem_Code>.pdf. If both exist, the PDF is used as the official statement (max PDF size: 5 MB).'),
         widget=forms.FileInput(attrs={'accept': 'application/zip'}),
     )
     is_organization = forms.BooleanField(required=False, label=_('Create as organization problems'))
