@@ -207,7 +207,8 @@ class AutoProblemUploadGuardMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.method == 'POST' and request.path_info.rstrip('/') == '/autoproblem':
+        autoproblem_paths = {'/autoproblem', '/problems/autoproblem'}
+        if request.method == 'POST' and request.path_info.rstrip('/') in autoproblem_paths:
             content_length = request.META.get('CONTENT_LENGTH')
             if content_length:
                 try:

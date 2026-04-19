@@ -523,6 +523,20 @@
     <link rel="stylesheet" type="text/css" href="{{ static('ui_form.css') }}">
 {% endblock %}
 
+{% block title_row %}
+    <div class="tabs">
+        <h2 style="margin: 0;">{% if content_title %}{{ content_title }}{% else %}{{ title }}{% endif %}</h2>
+        <span class="spacer"></span>
+        <ul>
+            <li class="tab">
+                <a href="/problems/autoproblem/guide/" class="btn btn-default" target="_blank" rel="noopener noreferrer">
+                    <i class="tab-icon fa fa-book"></i>{{ _('Usage Guide') }}
+                </a>
+            </li>
+        </ul>
+    </div>
+{% endblock %}
+
 {% block body %}
     <input type="hidden" id="contest-org-prefix-map" value="{{ contest_org_prefix_map_json|default('{}')|escape }}">
     <input type="hidden" id="report-task-id" value="{{ current_task_id|default('')|escape }}">
