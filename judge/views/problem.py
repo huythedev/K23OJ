@@ -10,6 +10,7 @@ import time
 import traceback
 import uuid
 import zipfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta
 from operator import itemgetter
 from random import randrange
@@ -682,6 +683,8 @@ autoproblem_logger = logging.getLogger('judge.problem.autoproblem')
 def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_organization_id=None):
     timeout = 300
     copy_buffer_size = 4 * 1024 * 1024
+    max_concurrency_setting = safe_int_or_none(getattr(settings, 'AUTOPROBLEM_MAX_CONCURRENCY', 10))
+    max_concurrency = max(1, min(10, max_concurrency_setting or 10))
     report = {
         'created': [],
         'skipped': [],
@@ -1081,26 +1084,22 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                     })
 
             total_generation = len(created_problem_payloads)
-            for index, created_problem in enumerate(created_problem_payloads, start=1):
-                set_task_state(
-                    'PROGRESS',
-                    current=index,
-                    total=total_generation,
-                    message=(
-                        'Processing PDF statement for %s...'
-                        if created_problem.get('has_pdf_statement')
-                        else 'Generating testcases for %s...'
-                    ) % created_problem['problem'].code,
-                )
-                time.sleep(0.1)
+            for created_problem in created_problem_payloads:
+                created_problem['problem_id'] = created_problem['problem'].id
+                created_problem['problem_data_id'] = created_problem['problem_data'].id
 
+            def run_phase3_for_problem(created_problem):
+                close_old_connections()
                 try:
+                    problem = Problem.objects.get(pk=created_problem['problem_id'])
+                    problem_data = ProblemData.objects.get(pk=created_problem['problem_data_id'])
+
                     if created_problem.get('pdf_stage_path'):
                         with open(created_problem['pdf_stage_path'], 'rb') as pdf_statement_file:
-                            created_problem['problem'].pdf_url = pdf_statement_uploader(
+                            problem.pdf_url = pdf_statement_uploader(
                                 File(pdf_statement_file, name=created_problem.get('pdf_filename'))
                             )
-                        created_problem['problem'].save(update_fields=('pdf_url',))
+                        problem.save(update_fields=('pdf_url',))
 
                     move_staged_file_to_storage(
                         created_problem['testcase_stage_path'],
@@ -1114,27 +1113,85 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                         )
 
                     ProblemDataCompiler.generate(
-                        created_problem['problem'],
-                        created_problem['problem_data'],
-                        created_problem['problem'].cases.order_by('order'),
+                        problem,
+                        problem_data,
+                        problem.cases.order_by('order'),
                         created_problem['testcase_valid_files'],
                     )
 
-                    created_problem['problem'].is_test_ready = True
-                    created_problem['problem'].save(update_fields=('is_test_ready',))
-                    time.sleep(0.1)
-                    post_problem_created(created_problem['problem'], target_organization)
+                    problem.is_test_ready = True
+                    problem.save(update_fields=('is_test_ready',))
+                    post_problem_created(problem, target_organization)
+                    return {
+                        'ok': True,
+                        'code': problem.code,
+                    }
                 except Exception as problem_error:
                     autoproblem_logger.exception(
                         'Phase 3 generation failed for %s in task %s',
-                        created_problem['problem'].code,
+                        created_problem.get('code', '?'),
                         task_id,
                     )
-                    report['skipped'].append({
+                    return {
+                        'ok': False,
                         'file': created_problem.get('file', '-'),
-                        'code': created_problem['problem'].code,
+                        'code': created_problem.get('code', ''),
                         'reason': str(problem_error),
-                    })
+                    }
+                finally:
+                    close_old_connections()
+
+            completed_generation = 0
+            if total_generation:
+                set_task_state(
+                    'PROGRESS',
+                    current=0,
+                    total=total_generation,
+                    message=_('Generating testcases with %(workers)d workers...') % {'workers': max_concurrency},
+                )
+
+            with ThreadPoolExecutor(max_workers=max_concurrency) as executor:
+                future_to_problem = {
+                    executor.submit(run_phase3_for_problem, created_problem): created_problem
+                    for created_problem in created_problem_payloads
+                }
+                for future in as_completed(future_to_problem):
+                    created_problem = future_to_problem[future]
+                    completed_generation += 1
+                    code = created_problem.get('code', '')
+
+                    try:
+                        phase3_result = future.result()
+                    except Exception as problem_error:
+                        autoproblem_logger.exception(
+                            'Unexpected phase 3 future failure for %s in task %s',
+                            code,
+                            task_id,
+                        )
+                        phase3_result = {
+                            'ok': False,
+                            'file': created_problem.get('file', '-'),
+                            'code': code,
+                            'reason': str(problem_error),
+                        }
+
+                    if not phase3_result.get('ok'):
+                        report['skipped'].append({
+                            'file': phase3_result.get('file', '-'),
+                            'code': phase3_result.get('code', code),
+                            'reason': phase3_result.get('reason', _('Unknown error while processing problem assets.')),
+                        })
+
+                    set_task_state(
+                        'PROGRESS',
+                        current=completed_generation,
+                        total=total_generation,
+                        message=_('Processed %(current)d/%(total)d: %(code)s') % {
+                            'current': completed_generation,
+                            'total': total_generation,
+                            'code': code or '-',
+                        },
+                    )
 
             result_payload = {
                 'report': report,

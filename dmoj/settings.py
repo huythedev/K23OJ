@@ -128,6 +128,9 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 3000
 FILE_UPLOAD_TEMP_DIR = None
 AUTOPROBLEM_UPLOAD_DISK_MULTIPLIER = 1.15
 AUTOPROBLEM_UPLOAD_DISK_RESERVE_BYTES = 1024 * 1024 * 1024
+# Number of concurrent workers used for per-problem phase-3 processing in autoproblem upload.
+# Runtime clamps this value to [1, 10] for safety.
+AUTOPROBLEM_MAX_CONCURRENCY = 10
 
 # List of online judge preset for OJ API
 OJ_PROBLEM_PRESET = [
