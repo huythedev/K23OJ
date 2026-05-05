@@ -69,12 +69,29 @@ class ContestCategoryList(TitleMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        categories = list(context['categories'])
+        active_category_slug = self.request.GET.get('category')
+        active_category = next((item for item in categories if item.slug == active_category_slug), None)
+
+        categories_by_id = {item.id: item for item in categories}
+        expanded_category_ids = set()
+        if active_category is not None:
+            parent_id = active_category.parent_id
+            while parent_id is not None:
+                expanded_category_ids.add(parent_id)
+                parent = categories_by_id.get(parent_id)
+                if parent is None:
+                    break
+                parent_id = parent.parent_id
+
         context['now'] = timezone.now()
-        context['categories_tree'] = self._build_category_tree(context['categories'])
+        context['category_hierarchy'] = self._build_category_hierarchy(categories)
+        context['active_category_id'] = active_category.id if active_category is not None else None
+        context['expanded_category_ids'] = expanded_category_ids
         return context
 
     @staticmethod
-    def _build_category_tree(categories):
+    def _build_category_hierarchy(categories):
         categories = list(categories)
         children_map = defaultdict(list)
         for category in categories:
@@ -83,21 +100,31 @@ class ContestCategoryList(TitleMixin, ListView):
         for entries in children_map.values():
             entries.sort(key=lambda item: item.name.lower())
 
-        ordered = []
+        visited = set()
 
-        def walk(parent_id, level):
+        def walk(parent_id):
+            nodes = []
             for category in children_map.get(parent_id, []):
-                ordered.append((category, level))
-                walk(category.id, level + 1)
+                if category.id in visited:
+                    continue
+                visited.add(category.id)
+                nodes.append({
+                    'category': category,
+                    'children': walk(category.id),
+                })
+            return nodes
 
-        walk(None, 0)
+        hierarchy = walk(None)
 
-        seen_ids = {category.id for category, _ in ordered}
         for category in sorted(categories, key=lambda item: item.name.lower()):
-            if category.id not in seen_ids:
-                ordered.append((category, 0))
+            if category.id not in visited:
+                visited.add(category.id)
+                hierarchy.append({
+                    'category': category,
+                    'children': walk(category.id),
+                })
 
-        return ordered
+        return hierarchy
 
 
 class ContestCategoryCreate(PermissionRequiredMixin, TitleMixin, FormView):

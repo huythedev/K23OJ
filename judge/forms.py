@@ -29,6 +29,36 @@ from judge.widgets import AceWidget, HeavySelect2MultipleWidget, HeavySelect2Wid
 
 TOTP_CODE_LENGTH = 6
 
+
+def _apply_selected_problem_order(selected_codes, selected_problem_order_raw):
+    if not selected_codes or not selected_problem_order_raw:
+        return selected_codes
+
+    try:
+        ordered_codes = json.loads(selected_problem_order_raw)
+    except (TypeError, ValueError):
+        return selected_codes
+
+    if not isinstance(ordered_codes, list):
+        return selected_codes
+
+    selected_set = set(selected_codes)
+    normalized = []
+    seen = set()
+
+    for code in ordered_codes:
+        if not isinstance(code, str):
+            continue
+        if code in selected_set and code not in seen:
+            normalized.append(code)
+            seen.add(code)
+
+    for code in selected_codes:
+        if code not in seen:
+            normalized.append(code)
+
+    return normalized
+
 two_factor_validators_by_length = {
     TOTP_CODE_LENGTH: {
         'regex_validator': RegexValidator(
@@ -368,6 +398,7 @@ class AutoProblemContestCreateForm(Form):
         widget=forms.CheckboxSelectMultiple,
         required=True,
     )
+    selected_problem_order = forms.CharField(required=False, widget=forms.HiddenInput())
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
@@ -397,6 +428,12 @@ class AutoProblemContestCreateForm(Form):
     def clean(self):
         cleaned_data = super().clean()
 
+        selected_codes = cleaned_data.get('selected_problems') or []
+        cleaned_data['selected_problems'] = _apply_selected_problem_order(
+            selected_codes,
+            cleaned_data.get('selected_problem_order'),
+        )
+
         if cleaned_data.get('is_organization'):
             organization = cleaned_data.get('organization')
             if organization is None:
@@ -412,7 +449,7 @@ class AutoProblemContestCreateForm(Form):
         return cleaned_data
 
 
-class AutoProblemContestCreateFormSet(formset_factory(AutoProblemContestCreateForm, extra=1)):
+class AutoProblemContestCreateFormSet(formset_factory(AutoProblemContestCreateForm, extra=1, can_delete=True)):
     pass
 
 
@@ -429,6 +466,7 @@ class AutoProblemAddToExistingContestForm(Form):
         widget=forms.CheckboxSelectMultiple,
         required=True,
     )
+    selected_problem_order = forms.CharField(required=False, widget=forms.HiddenInput())
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
@@ -462,6 +500,15 @@ class AutoProblemAddToExistingContestForm(Form):
         if not self.fields['existing_contest'].queryset.filter(pk=contest.pk).exists():
             raise ValidationError(_('You do not have permission to edit this contest.'))
         return contest
+
+    def clean(self):
+        cleaned_data = super().clean()
+        selected_codes = cleaned_data.get('selected_problems') or []
+        cleaned_data['selected_problems'] = _apply_selected_problem_order(
+            selected_codes,
+            cleaned_data.get('selected_problem_order'),
+        )
+        return cleaned_data
 
 
 class ProblemImportPolygonStatementForm(Form):
@@ -1046,17 +1093,37 @@ class ContestCategoryForm(ModelForm):
         slug = re.sub(r'_+', '_', slug).strip('_')
         return slug or 'category'
 
+    @staticmethod
+    def _with_parent_slug_prefix(slug, parent):
+        if parent is None:
+            return slug
+
+        prefix = '%s/' % parent.slug
+        if slug.startswith(prefix):
+            return slug
+
+        return '%s%s' % (prefix, slug.lstrip('/'))
+
     def save(self, commit=True):
         instance = super().save(commit=False)
 
-        if not instance.slug:
-            base_slug = self._slugify_category_name(instance.name)
-            candidate = base_slug
-            suffix = 2
-            while ContestCategory.objects.filter(slug=candidate).exists():
-                candidate = '%s_%d' % (base_slug, suffix)
-                suffix += 1
-            instance.slug = candidate
+        base_slug = instance.slug or self._slugify_category_name(instance.name)
+        base_slug = self._with_parent_slug_prefix(base_slug, instance.parent)
+        candidate = base_slug
+        suffix = 2
+
+        existing = ContestCategory.objects.filter(slug=candidate)
+        if instance.pk:
+            existing = existing.exclude(pk=instance.pk)
+
+        while existing.exists():
+            candidate = '%s_%d' % (base_slug, suffix)
+            suffix += 1
+            existing = ContestCategory.objects.filter(slug=candidate)
+            if instance.pk:
+                existing = existing.exclude(pk=instance.pk)
+
+        instance.slug = candidate
 
         if commit:
             instance.save()

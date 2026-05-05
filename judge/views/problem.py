@@ -2157,6 +2157,8 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
 
         if contest_formset.is_valid():
             for contest_form in contest_formset.forms:
+                if contest_form.cleaned_data.get('DELETE'):
+                    continue
                 if not contest_form.has_changed():
                     continue
                 contest = self._create_contest_from_autoproblem(contest_form)

@@ -27,6 +27,8 @@
                 const $contestOrganization = $scope.find('[name$="-organization"]');
                 const $contestId = $scope.find('[name$="-contest_id"]');
                 const $contestOrganizationRow = $contestOrganization.closest('tr');
+                const $contestDeleteInput = $scope.find('input[type="checkbox"][name$="-DELETE"]');
+                const $contestDeleteRow = $contestDeleteInput.closest('tr');
 
                 function getSelectedContestOrgPrefix() {
                     const selectedOrgId = $contestOrganization.val();
@@ -49,11 +51,247 @@
                 $contestIsOrganization.on('change', toggleContestIdPrefix);
                 $contestOrganization.on('change', toggleContestIdPrefix);
                 toggleContestIdPrefix();
+
+                if ($contestDeleteRow.length) {
+                    $contestDeleteRow.hide();
+                }
+
+                if ($contestDeleteInput.length && !$scope.find('.remove-contest-form-button').length) {
+                    const $heading = $scope.find('h5').first();
+                    const $removeButton = $('<button type="button" class="button remove-contest-form-button" style="margin-left: 0.6em;">{{ _("Delete this contest")|escapejs }}</button>');
+
+                    $removeButton.on('click', function () {
+                        $contestDeleteInput.prop('checked', true);
+                        $scope.hide();
+                    });
+
+                    if ($heading.length) {
+                        $heading.append($removeButton);
+                    } else {
+                        $scope.prepend($removeButton);
+                    }
+                }
             }
 
             const $contestForms = $('#contest-formset-container');
             const $totalForms = $('#id_contests-TOTAL_FORMS');
             const formTemplate = $('#contest-form-template').html();
+            const selectedProblemCheckboxSelector = 'input[type="checkbox"][name="selected_problems"], input[type="checkbox"][name$="-selected_problems"]';
+            const orderingStateByName = {};
+            const lastClickedByGroup = {};
+
+            function getGroupCheckboxes(groupName) {
+                return Array.from(document.querySelectorAll(selectedProblemCheckboxSelector))
+                    .filter(function (checkbox) {
+                        return checkbox.name === groupName;
+                    });
+            }
+
+            function parseGroupOrderFromHidden(groupName) {
+                const hiddenName = groupName.replace(/selected_problems$/, 'selected_problem_order');
+                const hidden = document.querySelector('input[type="hidden"][name="' + hiddenName + '"]');
+                if (!hidden || !hidden.value) {
+                    return [];
+                }
+
+                try {
+                    const parsed = JSON.parse(hidden.value);
+                    if (!Array.isArray(parsed)) {
+                        return [];
+                    }
+                    return parsed.filter(function (value) {
+                        return typeof value === 'string';
+                    });
+                } catch (error) {
+                    return [];
+                }
+            }
+
+            function getOrderingState(groupName) {
+                if (orderingStateByName[groupName]) {
+                    orderingStateByName[groupName].checkboxes = getGroupCheckboxes(groupName);
+                    return orderingStateByName[groupName];
+                }
+
+                const checkboxes = getGroupCheckboxes(groupName);
+                const hiddenName = groupName.replace(/selected_problems$/, 'selected_problem_order');
+                const hiddenInput = document.querySelector('input[type="hidden"][name="' + hiddenName + '"]');
+                const hiddenOrder = parseGroupOrderFromHidden(groupName);
+                const checkedValues = checkboxes
+                    .filter(function (checkbox) { return checkbox.checked; })
+                    .map(function (checkbox) { return checkbox.value; });
+                const checkedSet = new Set(checkedValues);
+                const seen = new Set();
+                const normalizedOrder = [];
+
+                hiddenOrder.forEach(function (value) {
+                    if (checkedSet.has(value) && !seen.has(value)) {
+                        normalizedOrder.push(value);
+                        seen.add(value);
+                    }
+                });
+
+                checkedValues.forEach(function (value) {
+                    if (!seen.has(value)) {
+                        normalizedOrder.push(value);
+                        seen.add(value);
+                    }
+                });
+
+                orderingStateByName[groupName] = {
+                    groupName: groupName,
+                    hiddenInput: hiddenInput,
+                    checkboxes: checkboxes,
+                    orderedCodes: normalizedOrder,
+                };
+                return orderingStateByName[groupName];
+            }
+
+            function persistGroupOrder(state) {
+                if (state.hiddenInput) {
+                    state.hiddenInput.value = JSON.stringify(state.orderedCodes);
+                }
+            }
+
+            function ensureOrderingWidgets(checkbox) {
+                const $checkbox = $(checkbox);
+                const $label = $checkbox.closest('label');
+                if ($label.length === 0) {
+                    return;
+                }
+
+                if (!checkbox.id) {
+                    checkbox.id = 'autoproblem-order-' + Math.random().toString(36).slice(2, 10);
+                }
+
+                if ($label.find('.problem-order-badge').length === 0) {
+                    $label.append('<span class="problem-order-badge" aria-hidden="true">-</span>');
+                }
+
+                if ($label.find('.problem-order-input').length === 0) {
+                    $label.append(
+                        '<input type="number" min="1" class="problem-order-input" data-checkbox-id="' +
+                        escapeHtml(checkbox.id) +
+                        '" title="{{ _("Problem order")|escapejs }}" placeholder="#">'
+                    );
+                }
+            }
+
+            function refreshGroupDisplay(groupName) {
+                const state = getOrderingState(groupName);
+                const orderIndexByCode = {};
+
+                state.orderedCodes.forEach(function (code, index) {
+                    orderIndexByCode[code] = index + 1;
+                });
+
+                state.checkboxes.forEach(function (checkbox) {
+                    ensureOrderingWidgets(checkbox);
+                    const $label = $(checkbox).closest('label');
+                    const orderNumber = checkbox.checked ? orderIndexByCode[checkbox.value] : null;
+                    const $badge = $label.find('.problem-order-badge').first();
+                    const $input = $label.find('.problem-order-input').first();
+
+                    if (orderNumber) {
+                        $badge.text(orderNumber).addClass('active');
+                        $input.val(orderNumber).prop('disabled', false);
+                    } else {
+                        $badge.text('-').removeClass('active');
+                        $input.val('').prop('disabled', true);
+                    }
+                });
+
+                persistGroupOrder(state);
+            }
+
+            function removeFromOrder(state, code) {
+                state.orderedCodes = state.orderedCodes.filter(function (value) {
+                    return value !== code;
+                });
+            }
+
+            function appendToOrder(state, code) {
+                removeFromOrder(state, code);
+                state.orderedCodes.push(code);
+            }
+
+            function applySelectionClick(target, isShiftKey) {
+                const groupName = target.name;
+                const state = getOrderingState(groupName);
+                state.checkboxes = getGroupCheckboxes(groupName);
+                const currentLast = lastClickedByGroup[groupName];
+
+                if (isShiftKey && currentLast) {
+                    const start = state.checkboxes.indexOf(currentLast);
+                    const end = state.checkboxes.indexOf(target);
+                    if (start !== -1 && end !== -1) {
+                        const direction = end >= start ? 1 : -1;
+                        for (let i = start; direction > 0 ? i <= end : i >= end; i += direction) {
+                            const checkbox = state.checkboxes[i];
+                            checkbox.checked = target.checked;
+                            if (target.checked) {
+                                appendToOrder(state, checkbox.value);
+                            } else {
+                                removeFromOrder(state, checkbox.value);
+                            }
+                        }
+                    }
+                } else if (target.checked) {
+                    appendToOrder(state, target.value);
+                } else {
+                    removeFromOrder(state, target.value);
+                }
+
+                lastClickedByGroup[groupName] = target;
+                refreshGroupDisplay(groupName);
+            }
+
+            function applyManualOrderInput(input) {
+                const checkboxId = input.getAttribute('data-checkbox-id');
+                if (!checkboxId) {
+                    return;
+                }
+
+                const checkbox = document.getElementById(checkboxId);
+                if (!checkbox) {
+                    return;
+                }
+
+                const groupName = checkbox.name;
+                const state = getOrderingState(groupName);
+                state.checkboxes = getGroupCheckboxes(groupName);
+
+                let requested = parseInt(input.value, 10);
+                if (!Number.isFinite(requested) || requested < 1) {
+                    refreshGroupDisplay(groupName);
+                    return;
+                }
+
+                if (!checkbox.checked) {
+                    checkbox.checked = true;
+                    state.orderedCodes.push(checkbox.value);
+                }
+
+                removeFromOrder(state, checkbox.value);
+                const boundedIndex = Math.max(0, Math.min(requested - 1, state.orderedCodes.length));
+                state.orderedCodes.splice(boundedIndex, 0, checkbox.value);
+                refreshGroupDisplay(groupName);
+            }
+
+            function initializeSelectedProblemOrdering(scopeElement) {
+                const root = scopeElement || document;
+                const checkboxes = root.querySelectorAll(selectedProblemCheckboxSelector);
+                const touchedGroups = new Set();
+
+                checkboxes.forEach(function (checkbox) {
+                    ensureOrderingWidgets(checkbox);
+                    touchedGroups.add(checkbox.name);
+                });
+
+                touchedGroups.forEach(function (groupName) {
+                    refreshGroupDisplay(groupName);
+                });
+            }
 
             const $uploadForm = $('#autoproblem-upload-form');
             const $uploadInput = $uploadForm.find('input[type="file"][name="package"]');
@@ -434,43 +672,35 @@
                 $contestForms.find('.contest-form-item').each(function () {
                     bindContestForm($(this));
                 });
+                initializeSelectedProblemOrdering($contestForms[0]);
 
                 $('#add-contest-form').on('click', function () {
                     const nextIndex = parseInt($totalForms.val(), 10);
                     const rendered = formTemplate.replace(/__prefix__/g, nextIndex);
                     $contestForms.append(rendered);
                     $totalForms.val(nextIndex + 1);
-                    bindContestForm($contestForms.find('.contest-form-item').last());
+                    const $newContestItem = $contestForms.find('.contest-form-item').last();
+                    bindContestForm($newContestItem);
+                    initializeSelectedProblemOrdering($newContestItem[0]);
                 });
             }
 
-            const selectedProblemCheckboxSelector = 'input[type="checkbox"][name="selected_problems"], input[type="checkbox"][name$="-selected_problems"]';
-            let lastChecked = null;
+            initializeSelectedProblemOrdering(document);
 
             document.addEventListener('click', function (e) {
                 const target = e.target;
                 if (!(target instanceof HTMLInputElement) || !target.matches(selectedProblemCheckboxSelector)) {
                     return;
                 }
+                applySelectionClick(target, e.shiftKey);
+            });
 
-                const groupedCheckboxes = Array.from(document.querySelectorAll(selectedProblemCheckboxSelector))
-                    .filter(function (checkbox) {
-                        return checkbox.name === target.name;
-                    });
-
-                if (e.shiftKey && lastChecked && lastChecked.name === target.name) {
-                    const start = groupedCheckboxes.indexOf(lastChecked);
-                    const end = groupedCheckboxes.indexOf(target);
-                    if (start !== -1 && end !== -1) {
-                        const from = Math.min(start, end);
-                        const to = Math.max(start, end);
-                        for (let i = from; i <= to; i += 1) {
-                            groupedCheckboxes[i].checked = target.checked;
-                        }
-                    }
+            document.addEventListener('change', function (e) {
+                const target = e.target;
+                if (!(target instanceof HTMLInputElement) || !target.classList.contains('problem-order-input')) {
+                    return;
                 }
-
-                lastChecked = target;
+                applyManualOrderInput(target);
             });
 
             const $contestActionRadios = $('input[name="contest_action_mode"]');
@@ -518,6 +748,35 @@
             to {
                 transform: rotate(360deg);
             }
+        }
+
+        .problem-order-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 1.6em;
+            height: 1.6em;
+            margin-left: 0.5em;
+            border-radius: 999px;
+            background: #e2e8f0;
+            color: #334155;
+            font-size: 0.82em;
+            font-weight: 700;
+        }
+
+        .problem-order-badge.active {
+            background: #2563eb;
+            color: #ffffff;
+        }
+
+        .problem-order-input {
+            width: 4.2em;
+            margin-left: 0.45em;
+            padding: 0.15em 0.35em;
+        }
+
+        .problem-order-input:disabled {
+            opacity: 0.5;
         }
     </style>
     <link rel="stylesheet" type="text/css" href="{{ static('ui_form.css') }}">

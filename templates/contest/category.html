@@ -15,56 +15,84 @@
         </div>
         <hr>
 
-        {% if categories_tree is defined and categories_tree %}
-            <table class="table striped">
-                <thead>
-                    <tr>
-                        <th>{{ _('Category') }}</th>
-                        <th>{{ _('Slug') }}</th>
-                        <th>{{ _('Parent') }}</th>
-                        <th>{{ _('Contests') }}</th>
-                        <th>{{ _('Updated') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for category, level in categories_tree %}
-                        <tr>
-                            <td>
-                                <span style="display: inline-block; width: {{ level * 1.2 }}em;"></span>
-                                {% if level > 0 %}<span style="opacity: 0.6;">↳ </span>{% endif %}
+        {% if category_hierarchy %}
+            <style>
+                .contest-category-tree,
+                .contest-category-tree ul {
+                    list-style: none;
+                    margin: 0;
+                    padding-left: 0;
+                }
+
+                .contest-category-tree ul {
+                    margin-top: 0.4em;
+                    margin-left: 1.2em;
+                    padding-left: 0.8em;
+                    border-left: 2px solid #ececec;
+                }
+
+                .contest-category-node {
+                    margin-bottom: 0.6em;
+                }
+
+                .contest-category-label {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.5em;
+                }
+
+                .contest-category-meta {
+                    margin-top: 0.25em;
+                    opacity: 0.75;
+                    font-size: 0.92em;
+                }
+
+                .contest-category-tree summary {
+                    cursor: pointer;
+                }
+
+                .contest-category-active > .contest-category-label > a {
+                    font-weight: 700;
+                    text-decoration: underline;
+                }
+            </style>
+
+            <ul class="contest-category-tree">
+                {% for node in category_hierarchy recursive %}
+                    {% set category = node.category %}
+                    {% set has_children = node.children|length > 0 %}
+                    {% set is_active = active_category_id == category.id %}
+                    {% set is_expanded = is_active or (category.id in expanded_category_ids) %}
+                    <li class="contest-category-node{% if is_active %} contest-category-active{% endif %}">
+                        {% if has_children %}
+                            <details{% if is_expanded %} open{% endif %}>
+                                <summary>
+                                    <span class="contest-category-label">
+                                        <a href="{{ category.get_absolute_url() }}">{{ category.name }}</a>
+                                        <span style="opacity: 0.7;">({{ category.slug }})</span>
+                                    </span>
+                                </summary>
+                                <div class="contest-category-meta">
+                                    {{ _('Contests: %(count)s', count=category.contests.count()) }}
+                                    • {{ _('Updated: %(date)s', date=category.updated_at|date(_('M j, Y, G:i'))) }}
+                                </div>
+                                <ul>
+                                    {{ loop(node.children) }}
+                                </ul>
+                            </details>
+                        {% else %}
+                            <div class="contest-category-label">
                                 <a href="{{ category.get_absolute_url() }}">{{ category.name }}</a>
-                            </td>
-                            <td>{{ category.slug }}</td>
-                            <td>{{ category.parent.name if category.parent else '-' }}</td>
-                            <td>{{ category.contests.count() }}</td>
-                            <td>{{ category.updated_at|date(_('M j, Y, G:i')) }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% elif categories %}
-            <table class="table striped">
-                <thead>
-                    <tr>
-                        <th>{{ _('Category') }}</th>
-                        <th>{{ _('Slug') }}</th>
-                        <th>{{ _('Parent') }}</th>
-                        <th>{{ _('Contests') }}</th>
-                        <th>{{ _('Updated') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for category in categories %}
-                        <tr>
-                            <td><a href="{{ category.get_absolute_url() }}">{{ category.name }}</a></td>
-                            <td>{{ category.slug }}</td>
-                            <td>{{ category.parent.name if category.parent else '-' }}</td>
-                            <td>{{ category.contests.count() }}</td>
-                            <td>{{ category.updated_at|date(_('M j, Y, G:i')) }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                                <span style="opacity: 0.7;">({{ category.slug }})</span>
+                            </div>
+                            <div class="contest-category-meta">
+                                {{ _('Contests: %(count)s', count=category.contests.count()) }}
+                                • {{ _('Updated: %(date)s', date=category.updated_at|date(_('M j, Y, G:i'))) }}
+                            </div>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
         {% else %}
             <p>{{ _('No categories yet.') }}</p>
         {% endif %}

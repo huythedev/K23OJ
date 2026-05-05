@@ -63,11 +63,11 @@ class ContestTag(models.Model):
 
 class ContestCategory(models.Model):
     name = models.CharField(max_length=100, verbose_name=_('category name'))
-    slug = models.SlugField(
-        max_length=64,
+    slug = models.CharField(
+        max_length=128,
         unique=True,
         verbose_name=_('category slug'),
-        validators=[RegexValidator('^[a-z0-9_]+$', _('Category slug must be ^[a-z0-9_]+$'))],
+        validators=[RegexValidator('^([a-z0-9_]+)(/[a-z0-9_]+)*$', _('Category slug must be path-like: ^([a-z0-9_]+)(/[a-z0-9_]+)*$'))],
     )
     description = models.TextField(verbose_name=_('description'), blank=True)
     parent = models.ForeignKey(

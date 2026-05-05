@@ -244,8 +244,8 @@ urlpatterns = [
     path('contests/category', include([
         path('', contests.ContestCategoryList.as_view(), name='contest_category_list_create'),
         path('/create', contests.ContestCategoryCreate.as_view(), name='contest_category_create'),
-        path('/<slug:slug>/edit', contests.ContestCategoryEdit.as_view(), name='contest_category_edit'),
-        path('/<slug:slug>', contests.ContestCategoryDetail.as_view(), name='contest_category_detail'),
+        path('/<path:slug>/edit', contests.ContestCategoryEdit.as_view(), name='contest_category_edit'),
+        path('/<path:slug>', contests.ContestCategoryDetail.as_view(), name='contest_category_detail'),
     ])),
     re_path(r'^contests/tag/(?P<name>[a-z-]+)', include([
         path('', contests.ContestTagDetail.as_view(), name='contest_tag'),
