@@ -247,6 +247,8 @@ urlpatterns = [
         path('/<path:slug>/edit', contests.ContestCategoryEdit.as_view(), name='contest_category_edit'),
         path('/<path:slug>', contests.ContestCategoryDetail.as_view(), name='contest_category_detail'),
     ])),
+    path('contest/category', lambda request:
+         HttpResponsePermanentRedirect(reverse('contest_category_list_create'))),
     re_path(r'^contests/tag/(?P<name>[a-z-]+)', include([
         path('', contests.ContestTagDetail.as_view(), name='contest_tag'),
         path('/ajax', contests.ContestTagDetailAjax.as_view(), name='contest_tag_ajax'),
