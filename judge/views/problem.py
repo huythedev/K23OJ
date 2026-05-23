@@ -1393,10 +1393,13 @@ class ProblemSubmit(LoginRequiredMixin, ProblemMixin, TitleMixin, SingleObjectFo
         return reverse('submission_status', args=(self.new_submission.id,))
 
     def form_valid(self, form):
+        zip_sources = form.cleaned_data.get('submission_zip_sources') or []
+        submission_count = len(zip_sources) or 1
         if (
             not self.request.user.has_perm('judge.spam_submission') and
             Submission.objects.filter(user=self.request.profile, rejudged_date__isnull=True)
-                              .exclude(status__in=['D', 'IE', 'CE', 'AB']).count() >= settings.DMOJ_SUBMISSION_LIMIT
+                              .exclude(status__in=['D', 'IE', 'CE', 'AB']).count() + submission_count
+                              > settings.DMOJ_SUBMISSION_LIMIT
         ):
             return HttpResponse(format_html('<h1>{0}</h1>', _('You submitted too many submissions.')), status=429)
         if not self.object.allowed_languages.filter(id=form.cleaned_data['language'].id).exists():
@@ -1407,6 +1410,9 @@ class ProblemSubmit(LoginRequiredMixin, ProblemMixin, TitleMixin, SingleObjectFo
                                      'You are permanently barred from submitting to this problem.'))
         # Must check for zero and not None. None means infinite submissions remaining.
         if self.remaining_submission_count == 0:
+            return generic_message(self.request, _('Too many submissions'),
+                                   _('You have exceeded the submission limit for this problem.'))
+        if self.remaining_submission_count is not None and self.remaining_submission_count < submission_count:
             return generic_message(self.request, _('Too many submissions'),
                                    _('You have exceeded the submission limit for this problem.'))
 
@@ -1438,38 +1444,51 @@ class ProblemSubmit(LoginRequiredMixin, ProblemMixin, TitleMixin, SingleObjectFo
                         % org_name,
                     )
 
-        with transaction.atomic():
-            self.new_submission = form.save(commit=False)
+        new_submissions = []
+        contest_problem = self.contest_problem
 
-            contest_problem = self.contest_problem
+        def build_submission(source_text=None, submission_file=None):
+            submission = Submission(user=self.request.profile, problem=self.object,
+                                    language=form.cleaned_data['language'])
             if contest_problem is not None:
-                # Use the contest object from current_contest.contest because we already use it
-                # in profile.update_contest().
-                self.new_submission.contest_object = self.request.profile.current_contest.contest
+                submission.contest_object = self.request.profile.current_contest.contest
                 if self.request.profile.current_contest.live:
-                    self.new_submission.locked_after = self.new_submission.contest_object.locked_after
-                self.new_submission.save()
+                    submission.locked_after = submission.contest_object.locked_after
+                submission.save()
                 ContestSubmission(
-                    submission=self.new_submission,
+                    submission=submission,
                     problem=contest_problem,
                     participation=self.request.profile.current_contest,
                 ).save()
             else:
-                self.new_submission.save()
+                submission.save()
 
-            submission_file = form.files.get('submission_file', None)
-            source_url = submission_uploader(
-                submission_file=submission_file,
-                problem_code=self.new_submission.problem.code,
-                user_id=self.new_submission.user.user.id,
-            ) if submission_file else ''
+            source_url = ''
+            if submission_file is not None:
+                source_url = submission_uploader(
+                    submission_file=submission_file,
+                    problem_code=submission.problem.code,
+                    user_id=submission.user.user.id,
+                )
 
-            source = SubmissionSource(submission=self.new_submission, source=form.cleaned_data['source'] + source_url)
+            source_value = (source_text or '') + source_url
+            source = SubmissionSource(submission=submission, source=source_value)
             source.save()
+            submission.source = source
+            new_submissions.append(submission)
 
-        # Save a query.
-        self.new_submission.source = source
-        self.new_submission.judge(force_judge=True, judge_id=form.cleaned_data['judge'])
+        with transaction.atomic():
+            if zip_sources:
+                for _, source_text in zip_sources:
+                    build_submission(source_text=source_text)
+            else:
+                submission_file = form.files.get('submission_file', None)
+                build_submission(source_text=form.cleaned_data['source'], submission_file=submission_file)
+
+        for submission in new_submissions:
+            submission.judge(force_judge=True, judge_id=form.cleaned_data['judge'])
+
+        self.new_submission = new_submissions[-1]
 
         # In contest mode, we should log the ip
         if settings.VNOJ_OFFICIAL_CONTEST_MODE:

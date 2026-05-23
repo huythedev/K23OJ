@@ -594,6 +594,11 @@ class ProblemSubmitForm(ModelForm):
         label=_('Source file'),
         required=False,
     )
+    submission_zip = forms.FileField(
+        label=_('Source ZIP'),
+        required=False,
+        widget=forms.FileInput(attrs={'accept': 'application/zip'}),
+    )
     judge = ChoiceField(choices=(), widget=forms.HiddenInput(), required=False)
 
     def clean(self):
@@ -602,14 +607,68 @@ class ProblemSubmitForm(ModelForm):
         return cleaned_data
 
     def check_submission(self):
-        source = self.cleaned_data.get('source', '')
+        source = self.cleaned_data.get('source', '') or ''
         content = self.files.get('submission_file', None)
+        zip_content = self.files.get('submission_zip', None)
         language = self.cleaned_data.get('language', None)
-        lang_obj = Language.objects.get(name=language)
+        if language is None:
+            return
+        lang_obj = language if isinstance(language, Language) else Language.objects.get(name=language)
 
-        if (source != '' and content is not None) or (source == '' and content is None) or \
-                (source != '' and lang_obj.file_only) or (content == '' and not lang_obj.file_only):
-            raise forms.ValidationError(_('Source code/file is missing or redundant. Please try again'))
+        has_source = bool(source.strip())
+        has_file = content is not None
+        has_zip = zip_content is not None
+
+        if has_zip:
+            has_source = False
+
+        if lang_obj.file_only:
+            if not has_file or has_source or has_zip:
+                raise forms.ValidationError(_('Source code/file is missing or redundant. Please try again'))
+        else:
+            if has_file or (not has_source and not has_zip):
+                raise forms.ValidationError(_('Source code/file is missing or redundant. Please try again'))
+
+        if has_zip:
+            if os.path.splitext(zip_content.name)[1].lower() != '.zip':
+                raise forms.ValidationError(_('Submission archive must be a ZIP file.'))
+
+            try:
+                zip_content.seek(0)
+                archive = zipfile.ZipFile(zip_content)
+            except (AttributeError, zipfile.BadZipFile):
+                raise forms.ValidationError(_('Submission archive must be a valid ZIP file.'))
+
+            allowed_ext = '.' + lang_obj.extension.lower()
+            file_names = [
+                name for name in archive.namelist()
+                if not name.endswith('/') and os.path.splitext(name)[1].lower() == allowed_ext
+            ]
+            file_names.sort()
+
+            if not file_names:
+                raise forms.ValidationError(_('No files with extension %(ext)s found in the ZIP.')
+                                            % {'ext': allowed_ext})
+
+            total_bytes = 0
+            for name in file_names:
+                total_bytes += archive.getinfo(name).file_size
+
+            max_uncompressed_bytes = 5 * 1024 * 1024
+            if total_bytes > max_uncompressed_bytes:
+                raise forms.ValidationError(_('ZIP contents are too large.'))
+
+            sources = []
+            for name in file_names:
+                data = archive.read(name)
+                text = data.decode('utf-8', errors='replace')
+                if len(text) > 65536:
+                    raise forms.ValidationError(_('File %(file)s exceeds 65536 characters.')
+                                                % {'file': name})
+                sources.append((name, text))
+
+            self.cleaned_data['submission_zip_sources'] = sources
+            self.cleaned_data['source'] = ''
 
         if content:
             max_file_size = lang_obj.file_size_limit * 1024 * 1024

@@ -282,6 +282,11 @@
                     <label for="file_select"><i>{{ _('Paste your source code here or load it from a file:') }}</i></label>
                     <input id="file_select" type="file" onchange="handleFileSelect()">
                 </div>
+                <div>
+                    <label for="zip_upload"><i>{{ _('Or upload a ZIP with multiple source files (processed alphabetically):') }}</i></label>
+                    {{ form.submission_zip.errors }}
+                    <input id="zip_upload" type="file" name="submission_zip" accept="application/zip">
+                </div>
                 {{ form.source.errors }}
                 {{ form.source }}
             </div>
