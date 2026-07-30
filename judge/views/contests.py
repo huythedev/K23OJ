@@ -1462,7 +1462,67 @@ class CreateContest(PermissionRequiredMixin, TitleMixin, CreateView):
     def get_context_data(self, **kwargs):
         data = super().get_context_data(**kwargs)
         data['contest_problem_formset'] = self.get_contest_problem_formset()
+        data['is_contest_creation'] = True
+        data['bulk_problem_input'] = self.request.POST.get('bulk_problems', '')
+        data['problem_input_mode'] = self.request.POST.get('problem_input_mode', 'manual')
         return data
+
+    def get_bulk_problems(self):
+        """Return validated bulk entries in the order in which they were supplied."""
+        entries = []
+        errors = []
+        seen_codes = set()
+
+        for line_number, raw_line in enumerate(self.request.POST.get('bulk_problems', '').splitlines(), start=1):
+            if not raw_line.strip():
+                continue
+
+            if raw_line.count('|') != 1:
+                errors.append(_('Line %(line)d must use the format <problem_id>|<points>.') % {
+                    'line': line_number,
+                })
+                continue
+
+            code, raw_points = (part.strip() for part in raw_line.split('|'))
+            if not code:
+                errors.append(_('Line %(line)d has no problem id.') % {'line': line_number})
+                continue
+            try:
+                points = int(raw_points)
+            except (TypeError, ValueError):
+                errors.append(_('Line %(line)d has an invalid points value.') % {'line': line_number})
+                continue
+
+            if code in seen_codes:
+                errors.append(_('Line %(line)d repeats problem id "%(code)s".') % {
+                    'line': line_number,
+                    'code': code,
+                })
+                continue
+            seen_codes.add(code)
+            entries.append((line_number, code, points))
+
+        if not entries and not errors:
+            errors.append(_('Enter at least one problem in bulk input.'))
+
+        visible_problems = {
+            problem.code: problem
+            for problem in Problem.get_visible_problems(self.request.user).filter(
+                code__in=[code for _, code, _ in entries],
+            )
+        }
+        parsed_problems = []
+        for line_number, code, points in entries:
+            problem = visible_problems.get(code)
+            if problem is None:
+                errors.append(_('Line %(line)d: problem id "%(code)s" is invalid or was not found.') % {
+                    'line': line_number,
+                    'code': code,
+                })
+                continue
+            parsed_problems.append((problem, points))
+
+        return parsed_problems, errors
 
     def save_contest_form(self, form):
         self.object = form.save()
@@ -1471,21 +1531,38 @@ class CreateContest(PermissionRequiredMixin, TitleMixin, CreateView):
 
     def post(self, request, *args, **kwargs):
         self.object = None
-        form = ContestForm(request.POST or None)
+        form = self.get_form()
         form_set = self.get_contest_problem_formset()
-        if form.is_valid() and form_set.is_valid():
+        bulk_input = request.POST.get('problem_input_mode') == 'bulk'
+        bulk_problems, bulk_errors = self.get_bulk_problems() if bulk_input else (None, [])
+
+        if bulk_errors:
+            for error in bulk_errors:
+                form.add_error(None, error)
+
+        problems_are_valid = not bulk_errors if bulk_input else form_set.is_valid()
+        if form.is_valid() and problems_are_valid:
             with revisions.create_revision(atomic=True):
                 self.save_contest_form(form)
-                for problem in form_set.save(commit=False):
-                    problem.contest = self.object
-                    problem.save()
+                if bulk_input:
+                    for order, (problem, points) in enumerate(bulk_problems, start=1):
+                        ContestProblem.objects.create(
+                            contest=self.object,
+                            problem=problem,
+                            points=points,
+                            order=order,
+                        )
+                else:
+                    for problem in form_set.save(commit=False):
+                        problem.contest = self.object
+                        problem.save()
 
                 revisions.set_comment(_('Created on site'))
                 revisions.set_user(self.request.user)
             on_new_contest.delay(self.object.key)
             return HttpResponseRedirect(self.get_success_url())
         else:
-            return self.render_to_response(self.get_context_data(*args, **kwargs))
+            return self.render_to_response(self.get_context_data(form=form, *args, **kwargs))
 
     def dispatch(self, request, *args, **kwargs):
         try:
