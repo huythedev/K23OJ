@@ -46,3 +46,4 @@ icalendar
 importlib-metadata<5
 setuptools
 websocket-client
+django-storages
