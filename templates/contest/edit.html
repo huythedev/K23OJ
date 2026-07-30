@@ -92,6 +92,24 @@
                     });
                 }
             });
+
+            {% if is_contest_creation %}
+            var $problemInputMode = $('#problem-input-mode');
+            function activateProblemInput(mode) {
+                var isBulk = mode === 'bulk';
+                $problemInputMode.val(isBulk ? 'bulk' : 'manual');
+                $('#manual-problem-input').toggle(!isBulk);
+                $('#bulk-problem-input').toggle(isBulk);
+                $('[data-problem-input-mode]').parent().toggleClass('active', false);
+                $('[data-problem-input-mode="' + (isBulk ? 'bulk' : 'manual') + '"]').parent().toggleClass('active', true);
+            }
+
+            $('[data-problem-input-mode]').on('click', function (event) {
+                event.preventDefault();
+                activateProblemInput($(this).data('problem-input-mode'));
+            });
+            activateProblemInput($problemInputMode.val() || 'manual');
+            {% endif %}
         })
     </script>
     {{ form.media.js }}
@@ -142,6 +160,16 @@
         <table class="django-as-table">{{ form.as_table() }}</table>
         <hr>
         <center><h3> {{ _('Problems') }} </h3></center>
+        {% if is_contest_creation %}
+            <input id="problem-input-mode" type="hidden" name="problem_input_mode" value="{{ problem_input_mode }}">
+            <div class="tabs" style="margin-bottom: 1em;">
+                <ul style="margin: 0;">
+                    <li><a href="#manual-problem-input" data-problem-input-mode="manual">{{ _('Manual Selection') }}</a></li>
+                    <li><a href="#bulk-problem-input" data-problem-input-mode="bulk">{{ _('Bulk Input') }}</a></li>
+                </ul>
+            </div>
+        {% endif %}
+        <div id="manual-problem-input">
         {% if contest_problem_formset.non_form_errors() %}
             {{ contest_problem_formset.non_form_errors() }}
         {% endif %}
@@ -169,6 +197,14 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
+        {% if is_contest_creation %}
+            <div id="bulk-problem-input" style="display: none;">
+                <label for="bulk-problems"><strong>{{ _('Bulk Input') }}</strong></label>
+                <p class="helptext">{{ _('One problem per line: <problem_id>|<points>. Empty lines are ignored.') }}</p>
+                <textarea id="bulk-problems" name="bulk_problems" rows="12" style="width: 100%; font-family: monospace;" placeholder="problem_id_1|100&#10;problem_id_2|200">{{ bulk_problem_input }}</textarea>
+            </div>
+        {% endif %}
         <div style="display: flex; justify-content: flex-end;"><button class="submit-bar" type="submit">
             {% if request.resolver_match.url_name == 'contest_edit' %}
                 {{ _('Update') }}
