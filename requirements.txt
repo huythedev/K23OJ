@@ -47,3 +47,5 @@ importlib-metadata<5
 setuptools
 websocket-client
 django-storages
+django-storages[boto3]
+boto3
