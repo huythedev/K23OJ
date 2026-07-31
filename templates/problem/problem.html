@@ -147,6 +147,7 @@
 {% endblock %}
 
 {% block info_float %}
+    <div class="problem-primary-actions">
     {% if request.user.is_authenticated and request.in_contest and submission_limit %}
         {% if submissions_left > 0 %}
             <a href="{{ url('problem_submit', problem.code) }}" class="unselectable button full">
@@ -229,9 +230,11 @@
             <a href="{{ url('problem_clone', problem.code) }}">{{ _('Clone problem') }}</a>
         </div>
     {% endif %}
+    </div>
 
     <hr style="padding-top: 0.3em">
 
+    <div class="problem-facts">
     <div class="problem-info-entry">
         <i class="fa fa-check fa-fw"></i><span class="pi-name">{{ _('Points:') }}</span>
         <span class="pi-value">
@@ -379,6 +382,7 @@
             </div>
         </div>
     {% endif %}
+    </div>
 {% endblock %}
 
 {% block description %}

@@ -108,6 +108,8 @@
     {% endcompress %}
 
     <link id="theme-style" rel="stylesheet" href="{% if PREFERRED_STYLE_CSS %}{{ static(PREFERRED_STYLE_CSS) }}{% else %}{{ static(LIGHT_STYLE_CSS) }}{% endif %}">
+    {# Product-level visual language shared by both theme bundles. #}
+    <link rel="stylesheet" href="{{ static('k23-modern.css') }}?v=20260730-11">
 
     <script>
         var lightTheme = "{{ static(LIGHT_STYLE_CSS) }}";
@@ -115,6 +117,7 @@
         
         function applyTheme(theme) {
             var link = document.getElementById('theme-style');
+            document.documentElement.dataset.k23Theme = theme;
             if (theme === 'dark') {
                 link.href = darkTheme;
             } else {
@@ -127,8 +130,7 @@
         }
 
         function toggleTheme() {
-            var link = document.getElementById('theme-style');
-            var currentTheme = link.href.indexOf(darkTheme) !== -1 ? 'dark' : 'light';
+            var currentTheme = document.documentElement.dataset.k23Theme || 'light';
             var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             localStorage.setItem('theme', newTheme);
             applyTheme(newTheme);
@@ -142,7 +144,11 @@
                 {% if not PREFERRED_STYLE_CSS %}
                     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
                         applyTheme('dark');
+                    } else {
+                        applyTheme('light');
                     }
+                {% else %}
+                    applyTheme('{% if PREFERRED_STYLE_CSS == DARK_STYLE_CSS %}dark{% else %}light{% endif %}');
                 {% endif %}
             }
         })();
