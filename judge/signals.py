@@ -8,19 +8,51 @@ from django.contrib.flatpages.models import FlatPage
 from django.core.cache import cache
 from django.core.cache.utils import make_template_fragment_key
 from django.db import transaction
-from django.db.models.signals import m2m_changed, post_delete, post_save
+from django.db.models.signals import m2m_changed, post_delete, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 from registration.models import RegistrationProfile
 from registration.signals import user_registered
 
 from judge.caching import contest_submission_started, finished_submission, submission_started
 from judge.models import BlogPost, Comment, Contest, ContestAnnouncement, ContestProblem, ContestSubmission, \
-    EFFECTIVE_MATH_ENGINES, Judge, Language, License, MiscConfig, Organization, Problem, Profile, Submission, \
-    WebAuthnCredential
-from judge.tasks import on_new_comment
+    EFFECTIVE_MATH_ENGINES, ExamTag, ExamTagProblemPoint, Judge, Language, License, MiscConfig, Organization, \
+    Problem, Profile, Submission, WebAuthnCredential
+from judge.tasks import on_new_comment, rebuild_exam_progress_for_exam, rebuild_exams_snapshots, \
+    sync_exam_progress_for_user_problem
 from judge.views.register import RegistrationView
 
 logger = logging.getLogger('judge.signals')
+
+
+def queue_exams_snapshot_rebuild():
+    def enqueue():
+        if cache.add('exams:snapshot:queued', 1, 10):
+            result = rebuild_exams_snapshots.apply_async(countdown=2)
+            cache.set('exams:snapshot:last_task', result.id, 86400)
+
+    transaction.on_commit(enqueue)
+
+
+def queue_exam_progress_rebuild(exam_tag_id):
+    if not exam_tag_id:
+        return
+    cache_key = f'exams:progress:queued:{exam_tag_id}'
+
+    def enqueue():
+        if cache.add(cache_key, 1, 10):
+            rebuild_exam_progress_for_exam.apply_async(args=[exam_tag_id], countdown=2)
+
+    transaction.on_commit(enqueue)
+
+
+def _exam_tag_ids_for_problem(problem_id):
+    exam_tag_ids = set(
+        Problem.exam_tags.through.objects.filter(problem_id=problem_id).values_list('examtag_id', flat=True),
+    )
+    exam_tag_ids |= set(
+        ExamTagProblemPoint.objects.filter(problem_id=problem_id).values_list('exam_tag_id', flat=True),
+    )
+    return exam_tag_ids
 
 
 def get_pdf_path(basename: str) -> Optional[str]:
@@ -59,6 +91,22 @@ def problem_update(sender, instance, **kwargs):
         if cached_pdf_filename is not None:
             unlink_if_exists(cached_pdf_filename)
 
+    queue_exams_snapshot_rebuild()
+    for exam_tag_id in _exam_tag_ids_for_problem(instance.id):
+        queue_exam_progress_rebuild(exam_tag_id)
+
+
+@receiver(pre_delete, sender=Problem)
+def problem_pre_delete(sender, instance, **kwargs):
+    instance._exam_tag_ids_before_delete = _exam_tag_ids_for_problem(instance.id)
+
+
+@receiver(post_delete, sender=Problem)
+def problem_delete(sender, instance, **kwargs):
+    queue_exams_snapshot_rebuild()
+    for exam_tag_id in getattr(instance, '_exam_tag_ids_before_delete', set()):
+        queue_exam_progress_rebuild(exam_tag_id)
+
 
 @receiver(post_save, sender=Profile)
 def profile_update(sender, instance, **kwargs):
@@ -92,6 +140,16 @@ def contest_problem_delete(sender, instance, **kwargs):
     # `contest_object` is the `Contest` object indirectly associated with the `Submission` object
     # `contest` is the `ContestSubmission` object associated with the `Submission` object
     Submission.objects.filter(contest_object=instance.contest, contest__isnull=True).update(contest_object=None)
+
+
+@receiver(post_save, sender=ExamTag)
+def exam_tag_update(sender, instance, **kwargs):
+    queue_exams_snapshot_rebuild()
+
+
+@receiver(post_delete, sender=ExamTag)
+def exam_tag_delete(sender, instance, **kwargs):
+    queue_exams_snapshot_rebuild()
 
 
 @receiver(post_save, sender=License)
@@ -136,6 +194,8 @@ def submission_delete(sender, instance, **kwargs):
     instance.user.calculate_points()
     instance.problem._updating_stats_only = True
     instance.problem.update_stats()
+    if _exam_tag_ids_for_problem(instance.problem_id):
+        sync_exam_progress_for_user_problem.delay(instance.user_id, instance.problem_id)
 
 
 @receiver(post_save, sender=Submission)
@@ -199,6 +259,82 @@ def profile_organization_update(sender, instance, action, **kwargs):
         orgs_to_be_updated = Organization.objects.filter(pk__in=pks)
     for org in orgs_to_be_updated:
         org.on_user_changes()
+
+
+@receiver(m2m_changed, sender=Problem.exam_tags.through)
+def problem_exam_tags_update(sender, instance, action, reverse, pk_set, **kwargs):
+    if action == 'pre_clear':
+        if reverse:
+            instance._exam_progress_problem_ids_before_clear = set(instance.problems.values_list('id', flat=True))
+        else:
+            instance._exam_progress_exam_tag_ids_before_clear = set(instance.exam_tags.values_list('id', flat=True))
+        return
+    if action not in ('post_add', 'post_remove', 'post_clear'):
+        return
+
+    exam_tag_ids = set()
+    if action == 'post_add':
+        if reverse:
+            problem_points = dict(Problem.objects.filter(id__in=pk_set).values_list('id', 'points'))
+            rows = [
+                ExamTagProblemPoint(exam_tag_id=instance.id, problem_id=problem_id, points=float(problem_points.get(problem_id, 0) or 0))
+                for problem_id in pk_set
+            ]
+            exam_tag_ids.add(instance.id)
+        else:
+            rows = [
+                ExamTagProblemPoint(exam_tag_id=exam_tag_id, problem_id=instance.id, points=float(instance.points or 0))
+                for exam_tag_id in pk_set
+            ]
+            exam_tag_ids |= set(pk_set)
+        if rows:
+            ExamTagProblemPoint.objects.bulk_create(rows, ignore_conflicts=True)
+    elif action == 'post_remove':
+        if reverse:
+            ExamTagProblemPoint.objects.filter(exam_tag_id=instance.id, problem_id__in=pk_set).delete()
+            exam_tag_ids.add(instance.id)
+        else:
+            ExamTagProblemPoint.objects.filter(problem_id=instance.id, exam_tag_id__in=pk_set).delete()
+            exam_tag_ids |= set(pk_set)
+    else:
+        if reverse:
+            ExamTagProblemPoint.objects.filter(exam_tag_id=instance.id).delete()
+            exam_tag_ids.add(instance.id)
+            instance._exam_progress_problem_ids_before_clear = set()
+        else:
+            exam_tag_ids = set(getattr(instance, '_exam_progress_exam_tag_ids_before_clear', set()))
+            ExamTagProblemPoint.objects.filter(problem_id=instance.id).delete()
+            instance._exam_progress_exam_tag_ids_before_clear = set()
+
+    queue_exams_snapshot_rebuild()
+    for exam_tag_id in exam_tag_ids:
+        queue_exam_progress_rebuild(exam_tag_id)
+
+
+@receiver(pre_save, sender=ExamTagProblemPoint)
+def exam_tag_problem_point_pre_save(sender, instance, **kwargs):
+    if instance.pk:
+        instance._old_exam_tag_problem_pair = (
+            ExamTagProblemPoint.objects.filter(pk=instance.pk).values_list('exam_tag_id', 'problem_id').first()
+        )
+
+
+@receiver(post_save, sender=ExamTagProblemPoint)
+def exam_tag_problem_point_update(sender, instance, **kwargs):
+    through_model = Problem.exam_tags.through
+    old_pair = getattr(instance, '_old_exam_tag_problem_pair', None)
+    if old_pair and old_pair != (instance.exam_tag_id, instance.problem_id):
+        through_model.objects.filter(examtag_id=old_pair[0], problem_id=old_pair[1]).delete()
+    through_model.objects.get_or_create(examtag_id=instance.exam_tag_id, problem_id=instance.problem_id)
+    queue_exams_snapshot_rebuild()
+    queue_exam_progress_rebuild(instance.exam_tag_id)
+
+
+@receiver(post_delete, sender=ExamTagProblemPoint)
+def exam_tag_problem_point_delete(sender, instance, **kwargs):
+    Problem.exam_tags.through.objects.filter(examtag_id=instance.exam_tag_id, problem_id=instance.problem_id).delete()
+    queue_exams_snapshot_rebuild()
+    queue_exam_progress_rebuild(instance.exam_tag_id)
 
 
 @receiver(post_save, sender=ContestAnnouncement)

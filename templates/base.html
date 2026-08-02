@@ -107,13 +107,13 @@
         <link rel="stylesheet" type="text/css" href="{{ static('libs/select2/select2.css') }}">
     {% endcompress %}
 
-    <link id="theme-style" rel="stylesheet" href="{% if PREFERRED_STYLE_CSS %}{{ static(PREFERRED_STYLE_CSS) }}{% else %}{{ static(LIGHT_STYLE_CSS) }}{% endif %}">
+    <link id="theme-style" rel="stylesheet" href="{% if PREFERRED_STYLE_CSS %}{{ static(PREFERRED_STYLE_CSS) }}{% else %}{{ static(LIGHT_STYLE_CSS) }}{% endif %}?v=20260802-layout2">
     {# Product-level visual language shared by both theme bundles. #}
     <link rel="stylesheet" href="{{ static('k23-modern.css') }}?v=20260731-27">
 
     <script>
-        var lightTheme = "{{ static(LIGHT_STYLE_CSS) }}";
-        var darkTheme = "{{ static(DARK_STYLE_CSS) }}";
+        var lightTheme = "{{ static(LIGHT_STYLE_CSS) }}?v=20260802-layout2";
+        var darkTheme = "{{ static(DARK_STYLE_CSS) }}?v=20260802-layout2";
         
         function applyTheme(theme) {
             var link = document.getElementById('theme-style');
@@ -221,6 +221,13 @@
                             {% if children %}<ul>{{ loop(children) }}</ul>{% endif %}
                         {% endwith %}
                     </li>
+                    {% if node.path in ['/official_contests', '/official_contests/'] %}
+                        <li>
+                            <a href="{{ url('exams_list') }}" class="nav-exams-list{% if request.path.startswith('/exams-list/') or request.path.startswith('/exams/') %} active{% endif %}">
+                                {{ _('Thống kê đề thi') }}
+                            </a>
+                        </li>
+                    {% endif %}
                 {% endfor %}
             {% else %}
                 {% macro make_navbar_item(key, url, text) %}

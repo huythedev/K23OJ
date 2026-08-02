@@ -13,7 +13,7 @@ from django.utils import timezone
 from judge import event_poster as event
 from judge.bridge.base_handler import ZlibPacketHandler, proxy_list
 from judge.caching import finished_submission
-from judge.models import Judge, Language, LanguageLimit, Problem, Profile, \
+from judge.models import ExamTagProblemPoint, Judge, Language, LanguageLimit, Problem, Profile, \
     RuntimeVersion, Submission, SubmissionTestCase
 from judge.models.problem import ProblemTestcaseResultAccess
 from judge.utils.url import get_absolute_submission_file_url
@@ -462,6 +462,13 @@ class JudgeHandler(ZlibPacketHandler):
         problem.update_stats()
         submission.update_contest()
         submission.update_credit(total_time)
+
+        if (
+            Problem.exam_tags.through.objects.filter(problem_id=problem.id).exists() or
+            ExamTagProblemPoint.objects.filter(problem_id=problem.id).exists()
+        ):
+            from judge.tasks import sync_exam_progress_for_user_problem
+            sync_exam_progress_for_user_problem.delay(submission.user_id, problem.id)
 
         finished_submission(submission)
 

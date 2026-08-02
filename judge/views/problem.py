@@ -2019,6 +2019,10 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
             kwargs['data'] = data
         return AutoProblemContestCreateFormSet(**kwargs)
 
+    def _get_unbound_upload_form(self):
+        """Build the upload form without data from a contest-management POST."""
+        return self.get_form_class()(user=self.request.user)
+
     def _get_add_existing_contest_form(self, created_items, data=None):
         kwargs = {
             'user': self.request.user,
@@ -2203,6 +2207,7 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
             'skipped': [],
         }
         return self.render_to_response(self.get_context_data(
+            form=self._get_unbound_upload_form(),
             report=report,
             contest_formset=contest_formset,
             add_existing_contest_form=add_existing_form,
@@ -2306,6 +2311,7 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
         }
         contest_org_prefix_map_json = json.dumps(self._build_contest_org_prefix_map(contest_formset))
         return self.render_to_response(self.get_context_data(
+            form=self._get_unbound_upload_form(),
             report=report,
             contest_formset=contest_formset,
             add_existing_contest_form=add_existing_form,

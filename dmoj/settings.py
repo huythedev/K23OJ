@@ -370,6 +370,14 @@ else:
                         'judge.ContestTag',
                     ],
                 },
+                {
+                    'model': 'judge.ExamTag',
+                    'icon': 'fa-graduation-cap',
+                    'children': [
+                        'judge.ExamCategory',
+                        'judge.ExamProvince',
+                    ],
+                },
                 ('judge.Ticket', 'fa-bell'),
                 {
                     'model': 'auth.User',

@@ -6,7 +6,7 @@ from django.utils.encoding import smart_str
 from django.views.generic.list import BaseListView
 
 from judge.jinja2.gravatar import gravatar
-from judge.models import Comment, Contest, Organization, Problem, Profile, Tag, TagGroup
+from judge.models import Comment, Contest, ExamTag, Organization, Problem, Profile, Tag, TagGroup
 
 
 def _get_user_queryset(term):
@@ -113,6 +113,31 @@ class TagSelect2View(Select2View):
     def get_queryset(self):
         return Tag.objects.filter(code__icontains=self.term, name__icontains=self.term,
                                   group__code__icontains=self.term, group__name__icontains=self.term)
+
+
+class ExamTagSelect2View(Select2View):
+    def get_queryset(self):
+        if not self.request.user.is_authenticated or not self.request.user.is_superuser:
+            return ExamTag.objects.none()
+        return ExamTag.objects.filter(
+            Q(slug__icontains=self.term) |
+            Q(name__icontains=self.term) |
+            Q(exam_type__icontains=self.term) |
+            Q(province__icontains=self.term) |
+            Q(category__name__icontains=self.term),
+        ).select_related('category').order_by('sort_order', 'name', 'slug')
+
+    def get_name(self, obj):
+        suffix = []
+        if obj.year:
+            suffix.append(str(obj.year))
+        if obj.category_id:
+            suffix.append(obj.category.name)
+        if obj.exam_type:
+            suffix.append(obj.exam_type)
+        if obj.province:
+            suffix.append(obj.province)
+        return f'{obj.name} ({" - ".join(suffix)})' if suffix else obj.name
 
 
 class OrganizationSelect2View(Select2View):

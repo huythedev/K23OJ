@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title_row %}
+    <h2>{{ _('Quản lý đề thi') }}</h2>
+{% endblock %}
+
+{% block media %}
+    <link rel="stylesheet" type="text/css" href="{{ static('ui_form.css') }}">
+{% endblock %}
+
+{% block body %}
+    <div class="content-description">
+        <p><a href="{{ url('exams_list') }}">{{ _('← Quay lại danh sách đề thi') }}</a></p>
+
+        <div class="exam-manage-grid">
+            <section class="exam-manage-card">
+                <h3>{{ _('Tạo đề thi mới') }}</h3>
+                <form method="post" class="exam-manage-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_exam">
+                    {% if exam_form.non_field_errors() %}<div class="form-errors">{{ exam_form.non_field_errors() }}</div>{% endif %}
+                    <table class="django-as-table">{{ exam_form.as_table() }}</table>
+                    <p class="exam-manage-actions"><button type="submit">{{ _('Tạo đề thi') }}</button></p>
+                </form>
+            </section>
+
+            <aside class="exam-manage-card">
+                <h3>{{ _('Danh mục') }}</h3>
+                <form method="post" class="exam-manage-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_category">
+                    {% if category_form.non_field_errors() %}<div class="form-errors">{{ category_form.non_field_errors() }}</div>{% endif %}
+                    <table class="django-as-table">{{ category_form.as_table() }}</table>
+                    <p class="exam-manage-actions"><button type="submit">{{ _('Thêm danh mục') }}</button></p>
+                </form>
+
+                <h3>{{ _('Tỉnh / thành') }}</h3>
+                <form method="post" class="exam-manage-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_province">
+                    {% if province_form.non_field_errors() %}<div class="form-errors">{{ province_form.non_field_errors() }}</div>{% endif %}
+                    <table class="django-as-table">{{ province_form.as_table() }}</table>
+                    <p class="exam-manage-actions"><button type="submit">{{ _('Thêm tỉnh / thành') }}</button></p>
+                </form>
+            </aside>
+        </div>
+
+        <h3 style="margin-top: 1.5em;">{{ _('Các đề thi') }}</h3>
+        <div class="h-scrollable-table">
+            <table class="table striped exam-list-table">
+                <thead><tr><th>{{ _('Đề thi') }}</th><th>{{ _('Ngày thi') }}</th><th>{{ _('Danh mục') }}</th><th>{{ _('Hiển thị') }}</th><th></th></tr></thead>
+                <tbody>
+                    {% for exam in exams %}
+                        <tr>
+                            <td><a class="exam-title-link" href="{{ url('exam_manage_detail', exam.slug) }}">{{ exam.name }}</a><div class="exam-title-meta">{{ exam.slug }}</div></td>
+                            <td>{% if exam.exam_date %}{{ exam.exam_date }}{% else %}-{% endif %}</td>
+                            <td>{% if exam.category %}{{ exam.category.name }}{% else %}{{ exam.exam_type or '-' }}{% endif %}</td>
+                            <td>{% if exam.is_public %}{{ _('Có') }}{% else %}{{ _('Không') }}{% endif %}</td>
+                            <td><a class="button" href="{{ url('exam_manage_detail', exam.slug) }}">{{ _('Chỉnh sửa') }}</a></td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5"><i>{{ _('Chưa có đề thi nào.') }}</i></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

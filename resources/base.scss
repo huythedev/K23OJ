@@ -94,8 +94,6 @@ footer {
     color: $color_primary50;
     display: block;
     width: 100%;
-    position: absolute;
-    bottom: 0;
 }
 
 // Modern Body Styles
@@ -174,9 +172,11 @@ hr {
 #content {
     margin: 60px auto auto;
     width: 90%;
-    height: 100%;
+    height: auto;
     min-height: 25em;
     display: block;
+    flex: 1 0 auto;
+    box-sizing: border-box;
     padding: $spacing-6 0;
 
     .title {
@@ -188,6 +188,9 @@ hr {
 footer {
     text-align: center;
     height: auto;
+    position: static;
+    flex: 0 0 auto;
+    margin-top: auto;
     padding: $spacing-6 0;
     border-top: 1px solid $color_primary25;
     background: $color_primary0;
@@ -320,8 +323,10 @@ noscript #noscript {
 
 // Modern Page Container
 #page-container {
-    min-height: 100%;
+    min-height: 100vh;
     position: relative;
+    display: flex;
+    flex-direction: column;
     margin: 0 auto;
     border-right: 1px solid $color_primary25;
     border-left: 1px solid $color_primary25;
@@ -331,7 +336,10 @@ noscript #noscript {
 }
 
 #content-body {
-    padding-bottom: 5em;
+    // Keep floated controls inside the content column so the footer always
+    // starts after their rendered height, including at high zoom levels.
+    display: flow-root;
+    padding-bottom: 0;
 }
 
 .title-line-action {
