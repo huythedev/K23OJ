@@ -244,7 +244,11 @@
 {% endblock %}
 
 {% block body %}
-    <br>
+    <div class="submit-workspace">
+    <div class="submit-workspace-header">
+        <a class="submit-back" href="{{ url('problem_detail', object.code) }}"><i class="fa fa-arrow-left"></i> {{ _('Back to problem') }}</a>
+        <span class="submit-kicker">{{ _('Solution workspace') }}</span>
+    </div>
     {% if not no_judges %}
         {% if default_lang not in form.fields.language.queryset %}
             <div class="alert alert-warning alert-dismissable">
@@ -330,4 +334,5 @@
             </div>
         {% endif %}
     </form>
+    </div>
 {% endblock %}

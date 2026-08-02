@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title_row %}
+    <div class="exam-page-heading">
+        <div>
+            <h2>{{ _('Đề thi') }}</h2>
+            <p>{{ _('Khám phá đề thi, theo dõi điểm số và tiếp tục phần bạn đang làm.') }}</p>
+        </div>
+        {% if request.user.is_superuser %}
+            <a class="button exam-manage-button" href="{{ url('exams_manage') }}"><i class="fa fa-cog"></i> {{ _('Quản lý đề thi') }}</a>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block body %}
+    <div class="content-description exam-list-page">
+        <section class="exam-filter-card">
+            <div class="exam-filter-card-heading">
+                <div>
+                    <h3>{{ _('Tìm đề thi') }}</h3>
+                    <p>{{ _('Lọc theo tên, danh mục, tỉnh thành hoặc năm tổ chức.') }}</p>
+                </div>
+                <div class="exam-summary-pills">
+                    <span><b>{{ filtered_count }}</b> {{ _('đề phù hợp') }}</span>
+                    <span><b>{{ summary.total|default(0) }}</b> {{ _('đề công khai') }}</span>
+                </div>
+            </div>
+            <form method="get" class="exam-filters-simple">
+                <div class="exam-filters-grid">
+                    <label class="exam-filter-field exam-filter-field-keyword">
+                        <span>{{ _('Từ khóa') }}</span>
+                        <input type="text" name="keyword" value="{{ filters.keyword }}" placeholder="{{ _('Tìm theo tên đề, note...') }}">
+                    </label>
+                    <label class="exam-filter-field">
+                        <span>{{ _('Danh mục') }}</span>
+                        <select name="exam_category">
+                            {% for value, label in category_choices %}
+                                <option value="{{ value }}" {% if filters.exam_category == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="exam-filter-field">
+                        <span>{{ _('Tỉnh thành') }}</span>
+                        <select name="province">
+                            {% for value, label in province_choices %}
+                                <option value="{{ value }}" {% if filters.province == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="exam-filter-field">
+                        <span>{{ _('Năm') }}</span>
+                        <select name="year">
+                            {% for value, label in year_choices %}
+                                <option value="{{ value }}" {% if filters.year == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <div class="exam-filter-actions">
+                        <label class="exam-filter-checkbox">
+                            <input type="checkbox" name="hide_completed" value="1" {% if filters.hide_completed %}checked{% endif %}>
+                            <span>{{ _('Ẩn đề đã hoàn thành') }}</span>
+                        </label>
+                        <button type="submit"><i class="fa fa-search"></i> {{ _('Lọc đề') }}</button>
+                        <a href="?" class="exam-filter-reset">{{ _('Xóa lọc') }}</a>
+                    </div>
+                </div>
+            </form>
+        </section>
+
+        <section class="exam-results-card">
+            <div class="exam-results-heading">
+                <div><h3>{{ _('Danh sách đề thi') }}</h3><span>{{ _('Trang') }} {{ current_page }}/{{ total_pages }}</span></div>
+                {% if page_obj.has_other_pages() %}<div class="exam-results-pagination">{% include "list-pages.html" %}</div>{% endif %}
+            </div>
+
+            <div class="h-scrollable-table">
+                <table class="table striped exam-list-table">
+                    <thead><tr><th>{{ _('Đề thi') }}</th><th class="exam-progress-column">{{ _('Tiến độ của bạn') }}</th></tr></thead>
+                    <tbody>
+                        {% for item in items %}
+                            <tr>
+                                <td class="exam-title-cell">
+                                    <a href="{{ item.detail_url }}" class="exam-title-link">{{ item.name }}</a>
+                                    <div class="exam-meta-row">
+                                        {% if item.meta_line %}<span>{{ item.meta_line }}</span>{% endif %}
+                                        <span><i class="fa fa-calendar-o"></i> {{ item.exam_date_display }}</span>
+                                        <span class="exam-status exam-status-{{ item.status }}">{{ item.status_label }}</span>
+                                        <span>{{ item.progress_text }} {{ _('bài') }}</span>
+                                    </div>
+                                </td>
+                                <td class="exam-progress-cell">
+                                    {% if item.user_progress %}
+                                        <div class="exam-user-progress"><div class="exam-user-progress-track"><div class="exam-user-progress-fill" style="width: {{ item.user_progress.percent_css }}%;"></div></div><div class="exam-user-progress-text">{{ item.user_progress.text }}</div></div>
+                                    {% else %}<span class="exam-user-progress-empty">{{ _('Đăng nhập để theo dõi') }}</span>{% endif %}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="2" class="exam-empty-state"><i class="fa fa-search"></i> {{ _('Không có đề phù hợp bộ lọc.') }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if page_obj.has_other_pages() %}<div class="exam-bottom-pagination">{% include "list-pages.html" %}</div>{% endif %}
+        </section>
+    </div>
+{% endblock %}

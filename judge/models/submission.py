@@ -17,7 +17,7 @@ from judge.models.runtime import Language
 from judge.utils.new_ioi import contest_is_new_ioi, get_hidden_batches_for_problem
 from judge.utils.unicode import utf8bytes
 
-__all__ = ['SUBMISSION_RESULT', 'Submission', 'SubmissionSource', 'SubmissionTestCase']
+__all__ = ['SUBMISSION_RESULT', 'Submission', 'SubmissionSource', 'SubmissionTestCase', 'TestcaseDownloadLog']
 
 SUBMISSION_RESULT = (
     ('AC', _('Accepted')),
@@ -364,3 +364,30 @@ class SubmissionTestCase(models.Model):
         unique_together = ('submission', 'case')
         verbose_name = _('submission test case')
         verbose_name_plural = _('submission test cases')
+
+
+class TestcaseDownloadLog(models.Model):
+    INPUT = 'input'
+    OUTPUT = 'output'
+    FILE_TYPES = (
+        (INPUT, _('Input (.inp)')),
+        (OUTPUT, _('Output (.out)')),
+    )
+
+    requester = models.ForeignKey(Profile, verbose_name=_('downloaded by'), null=True, blank=True,
+                                  related_name='testcase_download_logs', on_delete=models.SET_NULL)
+    submission = models.ForeignKey(Submission, verbose_name=_('submission'), null=True, blank=True,
+                                   related_name='testcase_download_logs', on_delete=models.SET_NULL)
+    problem = models.ForeignKey(Problem, verbose_name=_('problem'), null=True, blank=True,
+                                related_name='testcase_download_logs', on_delete=models.SET_NULL)
+    testcase = models.ForeignKey('ProblemTestCase', verbose_name=_('test case'), null=True, blank=True,
+                                 related_name='download_logs', on_delete=models.SET_NULL)
+    testcase_number = models.PositiveIntegerField(verbose_name=_('test case number'))
+    file_type = models.CharField(verbose_name=_('downloaded file'), max_length=6, choices=FILE_TYPES)
+    ip_address = models.GenericIPAddressField(verbose_name=_('IP address'), null=True, blank=True)
+    downloaded_at = models.DateTimeField(verbose_name=_('download time'), auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ('-downloaded_at',)
+        verbose_name = _('testcase download log')
+        verbose_name_plural = _('testcase download logs')

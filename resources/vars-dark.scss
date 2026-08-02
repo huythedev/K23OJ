@@ -2,34 +2,35 @@
 
 $is_light_theme: false;
 
-// Modern Dark Theme Colors
-$color_primary0: #121214;
-$color_primary5: #1c1c1e;      // light background
-$color_primary10: #242427;     // background
-$color_primary25: #323236;     // border
-$color_primary33: #4a4a52;     // widget
-$color_primary50: #71717a;
-$color_primary66: #a1a1aa;     // tabs
-$color_primary75: #d4d4d8;     // widget
-$color_primary90: #e4e4e7;
-$color_primary100: #fafafa;
+// Slate / cool-gray dark theme. Keep the canvas and surfaces distinct without
+// resorting to black backgrounds or pure-white type.
+$color_primary0: #161b22;      // cards, inputs, and panels
+$color_primary5: #1e293b;      // raised surfaces
+$color_primary10: #21262d;     // hover and active surfaces
+$color_primary25: #334155;     // subtle 1px separators
+$color_primary33: #475569;     // controls and stronger borders
+$color_primary50: #94a3b8;     // muted text and metadata
+$color_primary66: #cbd5e1;     // supporting text
+$color_primary75: #e2e8f0;     // strong secondary text
+$color_primary90: #f1f5f9;     // headings
+$color_primary100: #f8fafc;    // primary text (soft off-white)
 
-// Modern Link Colors for Dark Mode
-$color_link50: #818cf8;    // default (title) - indigo
-$color_link75: #a5b4fc;    // default - lighter indigo
-$color_link100: #c7d2fe;   // hover
-$color_link200: #fbbf24;   // active - amber
+// Indigo is reserved for primary actions, active states, and links.
+$color_link50: #6366f1;
+$color_link75: #818cf8;
+$color_link100: #a5b4fc;
+$color_link200: #93c5fd;
 
-$color_pageBg: #18181b;
+$color_pageBg: #0f172a;
 
 // Semantic Colors
 $color_contest_ranking_disqualified: #450a0a;
 
-$color_martor_resize_dragger: #323236;
+$color_martor_resize_dragger: #334155;
 
 // Rating Colors - More vibrant for dark mode
-$color_rating_none: #a1a1aa;
-$color_rating_newbie: #9ca3af;
+$color_rating_none: #94a3b8;
+$color_rating_newbie: #94a3b8;
 $color_rating_pupil: #4ade80;
 $color_rating_specialist: #2dd4bf;
 $color_rating_expert: #60a5fa;
@@ -40,29 +41,29 @@ $color_rating_grandmaster: #f87171;
 $color_select2_search_dropdown: $color_primary10;
 
 // Activity Heatmap
-$color_user_submission_activity0: #323236;
+$color_user_submission_activity0: #334155;
 $color_user_submission_activity1: #14532d;
 $color_user_submission_activity2: #166534;
 $color_user_submission_activity3: #22c55e;
 $color_user_submission_activity4: #4ade80;
 
-// Alert Colors - Modern for dark mode
+// Semantic colors remain deliberately muted against slate surfaces.
 $color_info25: #172554;
-$color_info50: #1e40af;
-$color_info100: #93c5fd;
-$color_success25: #14532d;
+$color_info50: #1d4ed8;
+$color_info100: #bfdbfe;
+$color_success25: #052e16;
 $color_success50: #166534;
-$color_success100: #86efac;
-$color_warning25: #422006;
+$color_success100: #bbf7d0;
+$color_warning25: #451a03;
 $color_warning50: #a16207;
-$color_warning100: #fcd34d;
+$color_warning100: #fde68a;
 $color_danger25: #450a0a;
-$color_danger50: #991b1b;
-$color_danger100: #fca5a5;
+$color_danger50: #b91c1c;
+$color_danger100: #fecaca;
 
-$color_problem_submit_select2: #a1a1aa;
+$color_problem_submit_select2: #94a3b8;
 
-$color_voted_mark: #fbbf24;
+$color_voted_mark: #818cf8;
 
 $path_to_root: '..';    // relative path from style.css to STATIC_ROOT
 

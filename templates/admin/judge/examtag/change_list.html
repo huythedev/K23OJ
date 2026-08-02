@@ -1,0 +1,13 @@
+{% extends "reversion/change_list.html" %}
+{% load i18n %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    {% if not is_popup and request.user.is_superuser %}
+        <li>
+            <a href="{% url 'admin:judge_examtag_rebuild' %}" class="action-link">
+                <i class="fa fa-refresh"></i> {% trans "Rebuild public exam list" %}
+            </a>
+        </li>
+    {% endif %}
+{% endblock %}

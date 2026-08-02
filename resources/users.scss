@@ -34,7 +34,20 @@ span.organization {
     padding-left: 0.5em;
 }
 
+.profile-submit-actions {
+    display: flex;
+    justify-content: flex-end;
+    clear: both;
+    margin-top: 1rem;
+
+    .submit-bar {
+        float: none;
+    }
+}
+
 .users-table {
+    margin-bottom: 0;
+
     th.rank, th.points, th.problems, th.username {
         white-space: nowrap;
     }

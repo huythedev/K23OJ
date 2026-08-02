@@ -75,20 +75,20 @@
         </a>
         <span class="contest-tags">
             {% if not contest.is_visible %}
-                <span style="background-color: #000000; color: #ffffff" class="contest-tag">
+                <span style="background-color: #000000; color: #ffffff" class="contest-tag contest-tag-secondary">
                     <i class="fa fa-eye-slash"></i> {{ _('hidden') }}
                 </span>
             {% endif %}
             {% if contest.is_organization_private %}
                 {% for org in contest.organizations.all() %}
-                    <span style="background-color: #cccccc" class="contest-tag">
+                    <span style="background-color: #cccccc" class="contest-tag contest-tag-secondary">
                         <a href="{{ org.get_absolute_url() }}" style="color: #000000">
                             <i class="fa fa-lock"></i> {{ org.name }}
                         </a>
                     </span>
                 {% endfor %}
             {% elif contest.is_private %}
-                <span style="background-color: #666666; color: #ffffff" class="contest-tag">
+                <span style="background-color: #666666; color: #ffffff" class="contest-tag contest-tag-secondary">
                     <i class="fa fa-lock"></i> {{ _('private') }}
                 </span>
             {% endif %}

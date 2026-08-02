@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title_row %}
+    <h2>{{ _('Quản lý đề thi') }}: {{ exam.name }}</h2>
+{% endblock %}
+
+{% block media %}
+    <link rel="stylesheet" type="text/css" href="{{ static('ui_form.css') }}">
+{% endblock %}
+
+{% block body %}
+    <div class="content-description">
+        <p><a href="{{ url('exams_manage') }}">{{ _('← Tất cả đề thi') }}</a>{% if exam.is_public %} · <a href="{{ url('exam_detail', exam.slug) }}" target="_blank" rel="noopener">{{ _('Xem trang công khai') }}</a>{% endif %}</p>
+
+        <section class="exam-manage-card">
+            <h3>{{ _('Thông tin đề thi') }}</h3>
+            <form method="post" class="exam-manage-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_exam">
+                {% if exam_form.non_field_errors() %}<div class="form-errors">{{ exam_form.non_field_errors() }}</div>{% endif %}
+                <table class="django-as-table">{{ exam_form.as_table() }}</table>
+                <p class="exam-manage-actions"><button type="submit">{{ _('Lưu thông tin') }}</button></p>
+            </form>
+        </section>
+
+        <section class="exam-manage-card" style="margin-top: 1.25em;">
+            <h3>{{ _('Bài trong đề') }}</h3>
+            <div class="h-scrollable-table">
+                <table class="table striped">
+                    <thead><tr><th>{{ _('Mã bài') }}</th><th>{{ _('Tên bài') }}</th><th>{{ _('Điểm đề') }}</th><th>{{ _('Thứ tự') }}</th><th></th></tr></thead>
+                    <tbody>
+                        {% for point in problem_points %}
+                            <tr>
+                                <td><a href="{{ url('problem_detail', point.problem.code) }}" target="_blank" rel="noopener">{{ point.problem.code }}</a>{% if not point.problem.is_public or point.problem.is_organization_private %}<div class="exam-title-meta">{{ _('Chưa hiển thị công khai') }}</div>{% endif %}</td>
+                                <td>{{ point.problem.name }}</td>
+                                <td colspan="2">
+                                    <form method="post" class="exam-manage-point-form">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="update_problem"><input type="hidden" name="point_id" value="{{ point.id }}">
+                                        <input type="number" name="points" min="0" step="0.001" value="{{ point.points }}" aria-label="{{ _('Điểm đề') }}">
+                                        <input type="number" name="sort_order" step="1" value="{{ point.sort_order }}" aria-label="{{ _('Thứ tự') }}">
+                                        <button type="submit">{{ _('Lưu') }}</button>
+                                    </form>
+                                </td>
+                                <td>
+                                    <form method="post">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="remove_problem"><input type="hidden" name="point_id" value="{{ point.id }}">
+                                        <button type="submit" class="exam-manage-danger" onclick="return confirm('{{ _('Xóa bài này khỏi đề?') }}');">{{ _('Xóa') }}</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="5"><i>{{ _('Chưa có bài nào.') }}</i></td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 style="margin-top: 1em;">{{ _('Thêm bài') }}</h4>
+            <form method="post" class="exam-manage-problem-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_problem">
+                <label>{{ problem_form.problem_code.label }}{{ problem_form.problem_code }}{{ problem_form.problem_code.errors }}</label>
+                <label>{{ problem_form.points.label }}{{ problem_form.points }}{{ problem_form.points.errors }}</label>
+                <label>{{ problem_form.sort_order.label }}{{ problem_form.sort_order }}{{ problem_form.sort_order.errors }}</label>
+                <button type="submit">{{ _('Thêm bài') }}</button>
+            </form>
+        </section>
+
+        <div class="exam-manage-actions">
+            <form method="post">{% csrf_token %}<input type="hidden" name="action" value="rebuild"><button type="submit">{{ _('Cập nhật danh sách công khai') }}</button></form>
+            <form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete_exam"><button type="submit" class="exam-manage-danger" onclick="return confirm('{{ _('Xóa đề thi này và toàn bộ cấu hình bài?') }}');">{{ _('Xóa đề thi') }}</button></form>
+        </div>
+    </div>
+{% endblock %}

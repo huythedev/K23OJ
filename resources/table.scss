@@ -3,6 +3,10 @@
 .h-scrollable-table {
     overflow-x: auto;
     border-radius: $widget_border_radius_lg;
+
+    > .table {
+        margin-bottom: 0;
+    }
 }
 
 // Modern Table Styles
