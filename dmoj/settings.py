@@ -124,9 +124,10 @@ CELERY_TIMEZONE = 'UTC'
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 3000
 
 # Upload temp storage and safety headroom check (used by AutoProblemUploadGuardMiddleware).
+# AutoProblem holds the uploaded package and staged testcase ZIPs concurrently.
 # Resolved after loading local settings so it can follow MEDIA_ROOT overrides.
 FILE_UPLOAD_TEMP_DIR = None
-AUTOPROBLEM_UPLOAD_DISK_MULTIPLIER = 1.15
+AUTOPROBLEM_UPLOAD_DISK_MULTIPLIER = 2.15
 AUTOPROBLEM_UPLOAD_DISK_RESERVE_BYTES = 1024 * 1024 * 1024
 # Number of concurrent workers used for per-problem phase-3 processing in autoproblem upload.
 # Runtime clamps this value to [1, 10] for safety.
@@ -811,13 +812,19 @@ try:
 except IOError:
     pass
 
-# Keep upload temp path deployment-agnostic by deriving from MEDIA_ROOT.
+# Keep upload temp paths deployment-agnostic by deriving from MEDIA_ROOT.
 if not globals().get('MEDIA_ROOT'):
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 if not globals().get('MEDIA_URL'):
     MEDIA_URL = '/media/'
 FILE_UPLOAD_TEMP_DIR = os.path.join(MEDIA_ROOT, 'upload_tmp')
 os.makedirs(FILE_UPLOAD_TEMP_DIR, exist_ok=True)
+
+# AutoProblem keeps an archive and its per-problem ZIP files while it creates
+# the problems. Keep them with Django's disk-backed uploads, not in /tmp,
+# which may be a small tmpfs even when MEDIA_ROOT has plenty of free space.
+AUTOPROBLEM_TEMP_DIR = globals().get('AUTOPROBLEM_TEMP_DIR') or FILE_UPLOAD_TEMP_DIR
+os.makedirs(AUTOPROBLEM_TEMP_DIR, exist_ok=True)
 
 USE_X_FORWARDED_HOST = True
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024 * 1024  # 10GB
