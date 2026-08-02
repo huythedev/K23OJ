@@ -35,6 +35,8 @@ span.organization {
 }
 
 .users-table {
+    margin-bottom: 0;
+
     th.rank, th.points, th.problems, th.username {
         white-space: nowrap;
     }

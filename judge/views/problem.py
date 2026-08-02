@@ -1004,7 +1004,10 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
             created_problem_payloads = []
             set_task_state('PROGRESS', current=0, total=0, message=_('Saving problems to database...'))
             with transaction.atomic():
-                now = timezone.now()
+                # Preserve the package's sorted order in every date-based problem list.
+                # A single timestamp makes the database fall back to insertion order, which
+                # can vary between bulk inserts and makes a batch appear out of order.
+                upload_started_at = timezone.now()
                 Problem.objects.bulk_create([
                     Problem(
                         code=prepared_problem['code'],
@@ -1017,12 +1020,12 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
                         group=default_group,
                         submission_source_visibility_mode=SubmissionSourceAccess.FOLLOW,
                         testcase_visibility_mode=ProblemTestcaseAccess.AUTHOR_ONLY,
-                        date=now,
+                        date=upload_started_at + timedelta(microseconds=index),
                         is_test_ready=False,
                         autoproblem_task_id=task_id,
                         is_organization_private=(target_organization is not None),
                     )
-                    for prepared_problem in prepared_problems
+                    for index, prepared_problem in enumerate(prepared_problems)
                 ])
 
                 created_problems_by_code = {
@@ -2676,7 +2679,8 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
 
                 # Keep the transaction short: only database inserts/updates live in this block.
                 with transaction.atomic():
-                    for prepared_problem in prepared_problems:
+                    upload_started_at = timezone.now()
+                    for index, prepared_problem in enumerate(prepared_problems):
                         with revisions.create_revision(atomic=False):
                             problem = Problem.objects.create(
                                 code=prepared_problem['code'],
@@ -2689,7 +2693,8 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
                                 group=default_group,
                                 submission_source_visibility_mode=SubmissionSourceAccess.FOLLOW,
                                 testcase_visibility_mode=ProblemTestcaseAccess.AUTHOR_ONLY,
-                                date=timezone.now(),
+                                # Keep the natural A-to-Z package order stable in date-based views.
+                                date=upload_started_at + timedelta(microseconds=index),
                             )
                             self.assign_problem_ownership(problem)
                             problem.types.add(default_type)

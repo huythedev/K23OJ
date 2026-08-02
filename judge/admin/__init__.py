@@ -10,14 +10,14 @@ from judge.admin.organization import OrganizationAdmin, OrganizationRequestAdmin
 from judge.admin.problem import ProblemAdmin
 from judge.admin.profile import ProfileAdmin, UserAdmin
 from judge.admin.runtime import JudgeAdmin, LanguageAdmin
-from judge.admin.submission import SubmissionAdmin
+from judge.admin.submission import SubmissionAdmin, TestcaseDownloadLogAdmin
 from judge.admin.tag import TagAdmin, TagGroupAdmin, TagProblemAdmin
 from judge.admin.taxon import ProblemGroupAdmin, ProblemTypeAdmin
 from judge.admin.ticket import TicketAdmin
 from judge.models import Badge, BlogPost, Comment, CommentLock, Contest, ContestCategory, ContestParticipation, \
     ContestTag, Judge, Language, License, MiscConfig, NavigationBar, Organization, \
     OrganizationRequest, Problem, ProblemGroup, ProblemType, Profile, Submission, Tag, \
-    TagGroup, TagProblem, Ticket
+    TagGroup, TagProblem, TestcaseDownloadLog, Ticket
 
 admin.site.register(BlogPost, BlogPostAdmin)
 admin.site.register(Comment, CommentAdmin)
@@ -42,6 +42,7 @@ admin.site.register(ProblemGroup, ProblemGroupAdmin)
 admin.site.register(ProblemType, ProblemTypeAdmin)
 admin.site.register(Profile, ProfileAdmin)
 admin.site.register(Submission, SubmissionAdmin)
+admin.site.register(TestcaseDownloadLog, TestcaseDownloadLogAdmin)
 admin.site.register(Ticket, TicketAdmin)
 admin.site.register(Tag, TagAdmin)
 admin.site.register(TagGroup, TagGroupAdmin)

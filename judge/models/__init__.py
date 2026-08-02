@@ -12,7 +12,7 @@ from judge.models.problem_data import CHECKERS, ProblemData, ProblemTestCase, pr
 from judge.models.profile import Badge, Organization, OrganizationMonthlyUsage, OrganizationRequest, \
     Profile, WebAuthnCredential
 from judge.models.runtime import Judge, Language, RuntimeVersion
-from judge.models.submission import SUBMISSION_RESULT, Submission, SubmissionSource, SubmissionTestCase
+from judge.models.submission import SUBMISSION_RESULT, Submission, SubmissionSource, SubmissionTestCase, TestcaseDownloadLog
 from judge.models.tag import Tag, TagData, TagGroup, TagProblem
 from judge.models.ticket import GeneralIssue, Ticket, TicketMessage
 

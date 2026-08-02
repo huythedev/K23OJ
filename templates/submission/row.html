@@ -15,7 +15,7 @@
     </div>
 
     <div class="state">
-        <span title="{% if submission._new_ioi_masked %}{{ _('Hidden') }}{% else %}{{ submission.long_status }}{% endif %}" class="status">{% if submission._new_ioi_masked %}HD{% else %}{{ submission.short_status }}{% endif %}</span> |
+        <span title="{% if submission._new_ioi_masked %}{{ _('Hidden') }}{% else %}{{ submission.long_status }}{% endif %}" class="status">{% if submission._new_ioi_masked %}HD{% else %}{{ submission.short_status }}{% endif %}</span>
         <span class="language">{{ submission.language.short_display_name }}</span>
     </div>
 </div>

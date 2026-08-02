@@ -353,6 +353,7 @@ else:
                     ],
                 },
                 ('judge.Submission', 'fa-check-square-o'),
+                ('judge.TestcaseDownloadLog', 'fa-download'),
                 {
                     'model': 'judge.Language',
                     'icon': 'fa-file-code-o',
@@ -813,4 +814,3 @@ os.makedirs(FILE_UPLOAD_TEMP_DIR, exist_ok=True)
 USE_X_FORWARDED_HOST = True
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024 * 1024  # 10GB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 256 * 1024 * 1024        # 256MB in-memory, then use temp files
-
