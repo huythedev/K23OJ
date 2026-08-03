@@ -1,3 +1,4 @@
+import datetime as py_datetime
 import json
 import os
 from calendar import Calendar, SUNDAY
@@ -670,7 +671,7 @@ class ContestRegister(LoginRequiredMixin, ContestMixin, SingleObjectMixin, View)
 
                 ContestParticipation.objects.create(
                     contest=contest, user=profile, virtual=0,
-                    real_start=datetime(1970, 1, 1, tzinfo=timezone.utc),
+                    real_start=datetime(1970, 1, 1, tzinfo=py_datetime.timezone.utc),
                 )
             else:
                 return generic_message(request, _('Already registered'),
@@ -919,15 +920,15 @@ class ContestICal(TitleMixin, ContestListMixin, BaseListView):
         cal.add('prodid', '-//DMOJ//NONSGML Contests Calendar//')
         cal.add('version', '2.0')
 
-        now = timezone.now().astimezone(timezone.utc)
+        now = timezone.now().astimezone(py_datetime.timezone.utc)
         domain = self.request.get_host()
         for contest in self.get_queryset():
             event = Event()
             event.add('uid', f'contest-{contest.key}@{domain}')
             event.add('summary', contest.name)
             event.add('location', self.request.build_absolute_uri(contest.get_absolute_url()))
-            event.add('dtstart', contest.start_time.astimezone(timezone.utc))
-            event.add('dtend', contest.end_time.astimezone(timezone.utc))
+            event.add('dtstart', contest.start_time.astimezone(py_datetime.timezone.utc))
+            event.add('dtend', contest.end_time.astimezone(py_datetime.timezone.utc))
             event.add('dtstamp', now)
             cal.add_component(event)
         return cal.to_ical()
