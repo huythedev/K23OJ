@@ -8,7 +8,7 @@
 {% block media %}
     {{ form.media.css }}
     <style>
-        #id_name, #id_slug, #id_about, #id_logo_override_image {
+        #id_name, #id_slug, #id_about, #id_logo, #id_logo_override_image {
             width: 100%;
         }
         .django-as-table th {
@@ -18,7 +18,7 @@
 {% endblock %}
 
 {% block body %}
-    <form action="" method="post" class="form-area" style="display: flex; justify-content: center; flex-direction: column;">
+    <form action="" method="post" enctype="multipart/form-data" class="form-area" style="display: flex; justify-content: center; flex-direction: column;">
         {% csrf_token %}
         <table border="0" class="django-as-table">{{ form.as_table() }}</table>
         <div style="display: flex; justify-content: flex-end;">

@@ -315,4 +315,5 @@ class OrganizationSubdomainMiddleware(object):
         if hasattr(request, 'organization') and 'logo_override_image' not in response.context_data:
             # inject the logo override image into the template context
             response.context_data['logo_override_image'] = request.organization.logo_override_image
+            response.context_data['organization_logo'] = request.organization.logo
         return response

@@ -15,7 +15,7 @@ from django.views.generic import RedirectView
 from judge.feed import AtomBlogFeed, AtomCommentFeed, AtomProblemFeed, BlogFeed, CommentFeed, ProblemFeed
 from judge.sitemap import sitemaps
 from judge.views import TitledTemplateView, api, blog, comment, contests, exams, language, license, mailgun, organization, \
-    preview, problem, problem_manage, ranked_submission, register, stats, status, submission, tag, tasks, ticket, \
+    logo, preview, problem, problem_manage, ranked_submission, register, stats, status, submission, tag, tasks, ticket, \
     two_factor, user, widgets
 from judge.views.magazine import MagazinePage
 from judge.views.problem_data import ProblemDataView, ProblemSubmissionDiff, \
@@ -103,6 +103,7 @@ def paged_list_view(view, name):
 
 urlpatterns = [
     path('', blog.PostList.as_view(template_name='home.html', title=_('Home')), kwargs={'page': 1}, name='home'),
+    path('local-logo/<path:path>', logo.local_logo, name='local_logo'),
     path('autoproblem', problem.ProblemAutoProblem.as_view(), name='problem_autoproblem_legacy'),
     path('autoproblem/status/<uuid:task_id>', problem.autoproblem_task_status, name='problem_autoproblem_status_legacy'),
         path('autoproblem/status/<uuid:task_id>/details', problem.autoproblem_task_details,

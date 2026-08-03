@@ -5,7 +5,7 @@ from judge.models.comment import Comment, CommentLock, CommentVote
 from judge.models.contest import Contest, ContestAnnouncement, ContestCategory, ContestMoss, ContestParticipation, \
     ContestProblem, ContestSubmission, ContestTag, Rating
 from judge.models.exam import ExamCategory, ExamProvince, ExamTag, ExamTagProblemPoint, ExamUserProgress
-from judge.models.interface import BlogPost, BlogVote, MiscConfig, NavigationBar, validate_regex
+from judge.models.interface import BlogPost, BlogVote, MiscConfig, NavigationBar, SiteBranding, validate_regex
 from judge.models.problem import LanguageLimit, License, Problem, ProblemClarification, ProblemGroup, \
     ProblemTranslation, ProblemType, Solution, SubmissionSourceAccess, TranslatedProblemQuerySet
 from judge.models.problem_data import CHECKERS, ProblemData, ProblemTestCase, problem_data_storage, \

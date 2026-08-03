@@ -46,6 +46,7 @@ class OrganizationMixin(object):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['organization'] = self.organization
+        context['organization_logo'] = self.organization.logo
         context['logo_override_image'] = self.organization.logo_override_image
         context['meta_description'] = self.organization.about[:settings.DESCRIPTION_MAX_LENGTH]
         return context

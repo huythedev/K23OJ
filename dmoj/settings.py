@@ -817,6 +817,12 @@ if not globals().get('MEDIA_ROOT'):
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 if not globals().get('MEDIA_URL'):
     MEDIA_URL = '/media/'
+
+# Navbar logos must remain on this server even when DEFAULT_FILE_STORAGE points
+# to S3-compatible storage. They are served through the local_logo URL below.
+if not globals().get('LOCAL_LOGO_ROOT'):
+    LOCAL_LOGO_ROOT = os.path.join(MEDIA_ROOT, 'navbar_logos')
+
 FILE_UPLOAD_TEMP_DIR = os.path.join(MEDIA_ROOT, 'upload_tmp')
 os.makedirs(FILE_UPLOAD_TEMP_DIR, exist_ok=True)
 

@@ -7,7 +7,7 @@ from django.utils.functional import SimpleLazyObject, new_method_proxy
 
 from judge import event_poster as event
 from judge.utils.caniuse import CanIUse, SUPPORT
-from .models import NavigationBar, Profile
+from .models import NavigationBar, Profile, SiteBranding
 
 
 class FixedSimpleLazyObject(SimpleLazyObject):
@@ -69,8 +69,20 @@ def general_info(request):
     }
 
 
+def _site_logo_url(current_site):
+    try:
+        logo = current_site.branding.logo
+    except SiteBranding.DoesNotExist:
+        return ''
+    return logo.url if logo else ''
+
+
 def site(request):
-    return {'site': get_current_site(request)}
+    current_site = get_current_site(request)
+    return {
+        'site': current_site,
+        'SITE_LOGO_URL': SimpleLazyObject(partial(_site_logo_url, current_site)),
+    }
 
 
 def misc_config(request):
