@@ -5,7 +5,7 @@ from zipfile import ZipFile
 from django.test import TestCase
 from django.urls import reverse
 
-from judge.models import Language, ProblemTestCase, Submission, TestcaseDownloadLog, problem_data_storage
+from judge.models import Language, ProblemData, ProblemTestCase, Submission, TestcaseDownloadLog, problem_data_storage
 from judge.models.problem import ProblemTestcaseAccess
 from judge.models.tests.util import CommonDataMixin, create_problem
 
@@ -17,6 +17,7 @@ class TestcaseDownloadLogTestCase(CommonDataMixin, TestCase):
         cls.problem = create_problem(
             code='testcase_download_log',
             testcase_visibility_mode=ProblemTestcaseAccess.ALWAYS,
+            authors=('staff_problem_edit_own',),
         )
         cls.submission = Submission.objects.create(
             user=cls.users['normal'].profile,
@@ -57,5 +58,30 @@ class TestcaseDownloadLogTestCase(CommonDataMixin, TestCase):
         self.assertEqual(log.problem, self.problem)
         self.assertEqual(log.testcase, self.testcase)
         self.assertEqual(log.testcase_number, 1)
+        self.assertEqual(log.download_source, TestcaseDownloadLog.SUBMISSION)
         self.assertEqual(log.file_type, TestcaseDownloadLog.INPUT)
+        self.assertEqual(log.ip_address, '127.0.0.1')
+
+    def test_test_data_archive_download_is_logged(self):
+        archive_content = b'zip archive contents'
+        data = ProblemData.objects.create(problem=self.problem)
+        data.zipfile.name = '%s/data.zip' % self.problem.code
+        data.save(update_fields=('zipfile',))
+
+        self.client.force_login(self.users['staff_problem_edit_own'])
+        with patch.object(problem_data_storage, 'open', return_value=BytesIO(archive_content)):
+            response = self.client.get(reverse(
+                'problem_data_file', args=(self.problem.code, 'data.zip'),
+            ))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, archive_content)
+        log = TestcaseDownloadLog.objects.get()
+        self.assertEqual(log.requester, self.users['staff_problem_edit_own'].profile)
+        self.assertIsNone(log.submission)
+        self.assertEqual(log.problem, self.problem)
+        self.assertIsNone(log.testcase)
+        self.assertIsNone(log.testcase_number)
+        self.assertEqual(log.download_source, TestcaseDownloadLog.TEST_DATA)
+        self.assertEqual(log.file_type, TestcaseDownloadLog.ARCHIVE)
         self.assertEqual(log.ip_address, '127.0.0.1')

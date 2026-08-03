@@ -369,9 +369,17 @@ class SubmissionTestCase(models.Model):
 class TestcaseDownloadLog(models.Model):
     INPUT = 'input'
     OUTPUT = 'output'
+    ARCHIVE = 'archive'
+    SUBMISSION = 'submission'
+    TEST_DATA = 'test_data'
     FILE_TYPES = (
         (INPUT, _('Input (.inp)')),
         (OUTPUT, _('Output (.out)')),
+        (ARCHIVE, _('Test data archive (.zip)')),
+    )
+    DOWNLOAD_SOURCES = (
+        (SUBMISSION, _('Submission status')),
+        (TEST_DATA, _('Test data editor')),
     )
 
     requester = models.ForeignKey(Profile, verbose_name=_('downloaded by'), null=True, blank=True,
@@ -382,8 +390,10 @@ class TestcaseDownloadLog(models.Model):
                                 related_name='testcase_download_logs', on_delete=models.SET_NULL)
     testcase = models.ForeignKey('ProblemTestCase', verbose_name=_('test case'), null=True, blank=True,
                                  related_name='download_logs', on_delete=models.SET_NULL)
-    testcase_number = models.PositiveIntegerField(verbose_name=_('test case number'))
-    file_type = models.CharField(verbose_name=_('downloaded file'), max_length=6, choices=FILE_TYPES)
+    testcase_number = models.PositiveIntegerField(verbose_name=_('test case number'), null=True, blank=True)
+    download_source = models.CharField(verbose_name=_('download source'), max_length=10, choices=DOWNLOAD_SOURCES,
+                                       default=SUBMISSION)
+    file_type = models.CharField(verbose_name=_('downloaded file'), max_length=7, choices=FILE_TYPES)
     ip_address = models.GenericIPAddressField(verbose_name=_('IP address'), null=True, blank=True)
     downloaded_at = models.DateTimeField(verbose_name=_('download time'), auto_now_add=True, db_index=True)
 

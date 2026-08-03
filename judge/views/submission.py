@@ -26,8 +26,8 @@ from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import DetailView, ListView
 
 from judge.highlight_code import highlight_code
-from judge.models import Contest, Language, Organization, Problem, ProblemTranslation, Profile, Submission, TestcaseDownloadLog, \
-    problem_data_storage
+from judge.models import Contest, Language, Organization, Problem, ProblemTranslation, Profile, Submission, \
+    TestcaseDownloadLog, problem_data_storage
 from judge.models.problem import ProblemTestcaseResultAccess, SubmissionSourceAccess
 from judge.utils.infinite_paginator import InfinitePaginationMixin
 from judge.utils.lazy import memo_lazy
@@ -1058,6 +1058,7 @@ def download_testcase(request, submission_id, testcase_id, type):
         problem=problem,
         testcase=case,
         testcase_number=testcase_id,
+        download_source=TestcaseDownloadLog.SUBMISSION,
         file_type=TestcaseDownloadLog.INPUT if type == 'input' else TestcaseDownloadLog.OUTPUT,
         ip_address=request.META.get('REMOTE_ADDR'),
     )
