@@ -112,7 +112,7 @@ class TestMarkdown(SimpleTestCase):
         self.assertHTMLEqual(markdown('<script>void(0)</script>', self.BLEACHED_STYLE),
                              '&lt;script&gt;void(0)&lt;/script&gt;')
         self.assertHTMLEqual(markdown('<img style="display: block; margin: 0 auto">', self.BLEACHED_STYLE),
-                             '<p><img style="display: block; margin: 0 auto;"></p>')
+                             '<img style="display: block; margin: 0 auto;">')
         # self.assertHTMLEqual(markdown('<style>a { color: red; }</style>', self.BLEACHED_STYLE),
         #                      '<style>a { color: red; }</style>')
 
@@ -127,8 +127,8 @@ class TestMarkdown(SimpleTestCase):
 
     def test_post_process(self):
         self.assertHTMLEqual(markdown('<img src="test.png">', self.UNBLEACHED_STYLE, lazy_load=True),
-                             '<p><noscript><img src="test.png"></noscript>'
-                             '<img src="/static/blank.gif" data-src="test.png" class="unveil"></p>')
+                             '<noscript><img src="test.png"></noscript>'
+                             '<img src="/static/blank.gif" data-src="test.png" class="unveil">')
 
 
 class TestFragmentUtils(SimpleTestCase):

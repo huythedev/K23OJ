@@ -1,3 +1,4 @@
+@use "sass:color";
 @use "vars" as *;
 
 .h-scrollable-table {
@@ -29,7 +30,7 @@
     th {
         height: 2.5em;
         color: $color_primary0;
-        background: linear-gradient(135deg, $color_primary75 0%, darken($color_primary75, 5%) 100%);
+        background: linear-gradient(135deg, $color_primary75 0%, color.adjust($color_primary75, $lightness: -5%) 100%);
         border-color: transparent;
         border-width: 0;
         border-bottom: 2px solid $highlight_blue;

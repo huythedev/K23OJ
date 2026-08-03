@@ -1,4 +1,4 @@
-Django>=4.2,<5
+Django>=5.2,<5.3
 django-cleanup
 django_compressor>=3
 django-mptt>=0.13
@@ -12,10 +12,10 @@ mysqlclient
 dmoj-wpadmin @ git+https://github.com/DMOJ/dmoj-wpadmin.git
 lxml
 lxml_html_clean
-Pygments<2.12
-mistune<2
-social-auth-core==4.3.0
-social-auth-app-django==5.0.0
+Pygments>=2.20,<3
+mistune>=3.3,<4
+social-auth-core==5.0.2
+social-auth-app-django==6.0.1
 pytz
 django-statici18n
 pika
@@ -44,7 +44,7 @@ django-admin-sortable2
 icalendar
 # This is a celery dependency whose latest major version is breaking everything.
 importlib-metadata<5
-setuptools
+setuptools>=83,<84
 websocket-client
 django-storages
 django-storages[boto3]
