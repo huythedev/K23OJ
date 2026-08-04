@@ -8,7 +8,7 @@ import pyotp
 import webauthn
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.validators import RegexValidator
+from django.core.validators import FileExtensionValidator, RegexValidator
 from django.db import models
 from django.db.models import F, Max, Sum
 from django.urls import reverse
@@ -25,6 +25,7 @@ from judge.models.choices import ACE_THEMES, MATH_ENGINES_CHOICES, SITE_THEMES, 
 from judge.models.runtime import Language
 from judge.ratings import rating_class
 from judge.utils.float_compare import float_compare_equal
+from judge.utils.logo_storage import local_logo_storage
 from judge.utils.two_factor import webauthn_decode
 
 __all__ = ['Organization', 'OrganizationMonthlyUsage', 'Profile', 'OrganizationRequest', 'WebAuthnCredential']
@@ -35,6 +36,11 @@ class EncryptedNullCharField(EncryptedCharField):
         if not value:
             return None
         return super(EncryptedNullCharField, self).get_prep_value(value)
+
+
+def organization_logo_upload_path(instance, filename):
+    """Store organization logos under a non-guessable, PNG-only filename."""
+    return 'organization_logos/%s.png' % secrets.token_hex(16)
 
 
 class Organization(models.Model):
@@ -63,6 +69,14 @@ class Organization(models.Model):
                                            blank=True,
                                            help_text=_('This image will replace the default site logo for users '
                                                        'viewing the organization.'))
+    logo = models.ImageField(
+        verbose_name=_('organization logo'),
+        upload_to=organization_logo_upload_path,
+        storage=local_logo_storage,
+        blank=True,
+        validators=[FileExtensionValidator(allowed_extensions=['png'])],
+        help_text=_('Upload a PNG image to use as this organization\'s navbar logo.'),
+    )
     performance_points = models.FloatField(default=0)
     member_count = models.IntegerField(default=0)
     current_consumed_credit = models.FloatField(default=0, help_text='Total used credit this month')

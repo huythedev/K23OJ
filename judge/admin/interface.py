@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.flatpages.admin import FlatPageAdmin as OldFlatPageAdmin
 from django.contrib.flatpages.forms import FlatpageForm as OldFlatpageForm
+from django.contrib.sites.admin import SiteAdmin as OldSiteAdmin
+from django.core.exceptions import ValidationError
 from django.forms import ModelForm
 from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.utils.html import format_html
@@ -10,7 +12,7 @@ from mptt.admin import DraggableMPTTAdmin
 from reversion.admin import VersionAdmin
 
 from judge.dblock import LockModel
-from judge.models import NavigationBar
+from judge.models import NavigationBar, SiteBranding
 from judge.widgets import AdminHeavySelect2MultipleWidget, AdminHeavySelect2Widget, AdminMartorWidget
 
 
@@ -41,6 +43,31 @@ class NavigationBarAdmin(DraggableMPTTAdmin):
             with LockModel(write=(NavigationBar,)):
                 NavigationBar.objects.rebuild()
         return result
+
+
+class SiteBrandingForm(ModelForm):
+    def clean_logo(self):
+        logo = self.cleaned_data.get('logo')
+        if logo and logo.image.format != 'PNG':
+            raise ValidationError(_('Please upload a PNG image.'))
+        return logo
+
+    class Meta:
+        model = SiteBranding
+        fields = ('logo',)
+
+
+class SiteBrandingInline(admin.StackedInline):
+    model = SiteBranding
+    form = SiteBrandingForm
+    fields = ('logo',)
+    extra = 1
+    max_num = 1
+    can_delete = False
+
+
+class SiteAdmin(OldSiteAdmin):
+    inlines = (SiteBrandingInline,)
 
 
 class FlatpageForm(OldFlatpageForm):

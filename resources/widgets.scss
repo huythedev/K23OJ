@@ -1,3 +1,4 @@
+@use "sass:color";
 @use "vars" as *;
 
 .social i {
@@ -105,10 +106,10 @@
 
 // Danger button variant  
 .button-danger {
-    background: linear-gradient(135deg, $color_danger100 0%, darken($color_danger100, 10%) 100%) !important;
+    background: linear-gradient(135deg, $color_danger100 0%, color.adjust($color_danger100, $lightness: -10%) 100%) !important;
     
     &:hover {
-        background: linear-gradient(135deg, lighten($color_danger100, 5%) 0%, $color_danger100 100%) !important;
+        background: linear-gradient(135deg, color.adjust($color_danger100, $lightness: 5%) 0%, $color_danger100 100%) !important;
     }
 }
 

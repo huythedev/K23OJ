@@ -714,6 +714,7 @@ class ProblemSubmitForm(ModelForm):
 
 class TagProblemCreateForm(Form):
     problem_url = forms.URLField(max_length=200,
+                                 assume_scheme='https',
                                  label=_('Problem URL'),
                                  help_text=_('Full URL to the problem, '
                                              'e.g. https://oj.vnoi.info/problem/post'),
@@ -737,6 +738,12 @@ class TagProblemAssignForm(Form):
 
 
 class OrganizationForm(ModelForm):
+    def clean_logo(self):
+        logo = self.cleaned_data.get('logo')
+        if logo and logo.image.format != 'PNG':
+            raise ValidationError(_('Please upload a PNG image.'))
+        return logo
+
     def clean_paid_credit(self):
         credit = self.cleaned_data.get('paid_credit')
         if credit is not None:
@@ -753,7 +760,7 @@ class OrganizationForm(ModelForm):
         model = Organization
         fields = [
             'name', 'slug', 'paid_credit', 'monthly_free_credit_limit', 'is_open',
-            'about', 'logo_override_image', 'admins',
+            'about', 'logo', 'logo_override_image', 'admins',
         ]
         widgets = {'about': MartorWidget(attrs={'data-markdownfy-url': reverse_lazy('organization_preview')})}
         if HeavySelect2MultipleWidget is not None:

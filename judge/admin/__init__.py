@@ -2,11 +2,12 @@ from django.contrib import admin
 from django.contrib.admin.models import LogEntry
 from django.contrib.auth.models import User
 from django.contrib.flatpages.models import FlatPage
+from django.contrib.sites.models import Site
 
 from judge.admin.comments import CommentAdmin
 from judge.admin.contest import ContestAdmin, ContestCategoryAdmin, ContestParticipationAdmin, ContestTagAdmin
 from judge.admin.exam import ExamCategoryAdmin, ExamProvinceAdmin, ExamTagAdmin
-from judge.admin.interface import BlogPostAdmin, FlatPageAdmin, LicenseAdmin, LogEntryAdmin, NavigationBarAdmin
+from judge.admin.interface import BlogPostAdmin, FlatPageAdmin, LicenseAdmin, LogEntryAdmin, NavigationBarAdmin, SiteAdmin
 from judge.admin.organization import OrganizationAdmin, OrganizationRequestAdmin
 from judge.admin.problem import ProblemAdmin
 from judge.admin.profile import ProfileAdmin, UserAdmin
@@ -39,6 +40,8 @@ admin.site.register(LogEntry, LogEntryAdmin)
 admin.site.register(MiscConfig)
 admin.site.register(Badge)
 admin.site.register(NavigationBar, NavigationBarAdmin)
+admin.site.unregister(Site)
+admin.site.register(Site, SiteAdmin)
 admin.site.register(Organization, OrganizationAdmin)
 admin.site.register(OrganizationRequest, OrganizationRequestAdmin)
 admin.site.register(Problem, ProblemAdmin)

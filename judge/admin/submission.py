@@ -66,9 +66,9 @@ class SubmissionTestCaseInline(admin.TabularInline):
 
 
 class TestcaseDownloadLogAdmin(admin.ModelAdmin):
-    list_display = ('downloaded_at', 'requester', 'problem', 'submission', 'testcase_number', 'testcase', 'file_type',
-                    'ip_address')
-    list_filter = ('file_type', 'downloaded_at')
+    list_display = ('downloaded_at', 'requester', 'download_source', 'problem', 'submission', 'testcase_number',
+                    'testcase', 'file_type', 'ip_address')
+    list_filter = ('download_source', 'file_type', 'downloaded_at')
     search_fields = ('requester__user__username', 'problem__code', 'problem__name', '=submission__id', 'ip_address')
     list_select_related = ('requester__user', 'problem', 'submission', 'testcase')
     date_hierarchy = 'downloaded_at'

@@ -1,3 +1,4 @@
+import datetime as py_datetime
 import hashlib
 import hmac
 from importlib import import_module
@@ -692,7 +693,7 @@ class ContestParticipation(models.Model):
 
     @cached_property
     def pre_registered(self):
-        return self.real_start.astimezone(timezone.utc).date() == date(1970, 1, 1)
+        return self.real_start.astimezone(py_datetime.timezone.utc).date() == date(1970, 1, 1)
 
     @cached_property
     def start(self):

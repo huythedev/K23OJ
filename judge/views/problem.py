@@ -680,6 +680,17 @@ user_submit_ip_logger = logging.getLogger('judge.user_submit_ip_logger')
 autoproblem_logger = logging.getLogger('judge.problem.autoproblem')
 
 
+def get_autoproblem_temp_dir():
+    """Return the disk-backed workspace used for large AutoProblem uploads."""
+    temp_dir = (
+        getattr(settings, 'AUTOPROBLEM_TEMP_DIR', None)
+        or getattr(settings, 'FILE_UPLOAD_TEMP_DIR', None)
+        or tempfile.gettempdir()
+    )
+    os.makedirs(temp_dir, exist_ok=True)
+    return temp_dir
+
+
 def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_organization_id=None):
     timeout = 300
     copy_buffer_size = 4 * 1024 * 1024
@@ -827,7 +838,9 @@ def process_autoproblem_upload_thread(task_id, zip_file_path, user_id, target_or
 
         prepared_problems = []
 
-        with tempfile.TemporaryDirectory(prefix='autoproblem_stage_') as staging_dir:
+        with tempfile.TemporaryDirectory(
+            prefix='autoproblem_stage_', dir=get_autoproblem_temp_dir(),
+        ) as staging_dir:
             with zipfile.ZipFile(zip_file_path) as archive:
                 member_name_map = {}
                 for member in archive.namelist():
@@ -2448,11 +2461,17 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
             target_organization = form.cleaned_data.get('organization') if form.cleaned_data.get('is_organization') else None
             package = form.cleaned_data['package']
 
-            upload_dir = tempfile.mkdtemp(prefix='autoproblem_upload_')
+            upload_dir = tempfile.mkdtemp(prefix='autoproblem_upload_', dir=get_autoproblem_temp_dir())
             zip_file_path = os.path.join(upload_dir, '%s.zip' % uuid.uuid4())
-            with open(zip_file_path, 'wb') as destination:
-                for chunk in package.chunks():
-                    destination.write(chunk)
+            try:
+                # Files above FILE_UPLOAD_MAX_MEMORY_SIZE are already in a
+                # TemporaryUploadedFile. Moving it avoids making a second
+                # multi-gigabyte copy before the background worker starts.
+                shutil.move(package.temporary_file_path(), zip_file_path)
+            except AttributeError:
+                with open(zip_file_path, 'wb') as destination:
+                    for chunk in package.chunks():
+                        destination.write(chunk)
 
             task_id = str(uuid.uuid4())
             cache.set(
@@ -2505,7 +2524,9 @@ class ProblemAutoProblem(PermissionRequiredMixin, TitleMixin, FormView):
             package.file.seek(0)
             prepared_problems = []
 
-            with tempfile.TemporaryDirectory(prefix='autoproblem_stage_') as staging_dir:
+            with tempfile.TemporaryDirectory(
+                prefix='autoproblem_stage_', dir=get_autoproblem_temp_dir(),
+            ) as staging_dir:
                 with zipfile.ZipFile(package.file) as archive:
                     member_name_map = {}
                     for member in archive.namelist():

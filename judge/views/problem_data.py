@@ -19,7 +19,7 @@ from django.utils.translation import gettext as _, gettext_lazy
 from django.views.generic import DetailView
 
 from judge.highlight_code import highlight_code
-from judge.models import Problem, ProblemData, ProblemTestCase, Submission, problem_data_storage
+from judge.models import Problem, ProblemData, ProblemTestCase, Submission, TestcaseDownloadLog, problem_data_storage
 from judge.models.problem_data import CUSTOM_CHECKERS, IO_METHODS
 from judge.utils.problem_data import ProblemDataCompiler
 from judge.utils.unicode import utf8text
@@ -283,8 +283,9 @@ def problem_data_file(request, problem, path):
     if not object.is_editable_by(request.user):
         raise Http404()
 
+    storage_path = os.path.join(problem, path)
     problem_dir = problem_data_storage.path(problem)
-    if os.path.commonpath((problem_data_storage.path(os.path.join(problem, path)), problem_dir)) != problem_dir:
+    if os.path.commonpath((problem_data_storage.path(storage_path), problem_dir)) != problem_dir:
         raise Http404()
 
     response = HttpResponse()
@@ -295,9 +296,23 @@ def problem_data_file(request, problem, path):
         url_path = None
 
     try:
-        add_file_response(request, response, url_path, os.path.join(problem, path), problem_data_storage)
+        add_file_response(request, response, url_path, storage_path, problem_data_storage)
     except IOError:
         raise Http404()
+
+    try:
+        is_test_data_archive = object.data_files.zipfile.name == storage_path
+    except ProblemData.DoesNotExist:
+        is_test_data_archive = False
+
+    if is_test_data_archive:
+        TestcaseDownloadLog.objects.create(
+            requester=request.profile,
+            problem=object,
+            download_source=TestcaseDownloadLog.TEST_DATA,
+            file_type=TestcaseDownloadLog.ARCHIVE,
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
 
     response['Content-Type'] = 'application/octet-stream'
     return response

@@ -191,7 +191,8 @@ class APIMiddleware(object):
 
 class AutoProblemUploadGuardMiddleware:
     # Keep enough free space because request bodies may be buffered by reverse proxy and Django upload handlers.
-    default_disk_multiplier = 1.15
+    # The worker retains the package while it stages its testcase archives.
+    default_disk_multiplier = 2.15
     default_reserve_bytes = 1024 * 1024 * 1024
 
     @staticmethod
@@ -217,7 +218,14 @@ class AutoProblemUploadGuardMiddleware:
                     upload_size = 0
 
                 if upload_size > 0:
-                    upload_temp_dir = getattr(settings, 'FILE_UPLOAD_TEMP_DIR', None) or tempfile.gettempdir()
+                    # The asynchronous AutoProblem worker stages the package and its
+                    # inner testcase archives here. This must be the same directory
+                    # that the worker checks, rather than the system /tmp directory.
+                    upload_temp_dir = (
+                        getattr(settings, 'AUTOPROBLEM_TEMP_DIR', None)
+                        or getattr(settings, 'FILE_UPLOAD_TEMP_DIR', None)
+                        or tempfile.gettempdir()
+                    )
                     disk_multiplier = float(getattr(settings, 'AUTOPROBLEM_UPLOAD_DISK_MULTIPLIER', self.default_disk_multiplier))
                     reserve_bytes = int(getattr(settings, 'AUTOPROBLEM_UPLOAD_DISK_RESERVE_BYTES', self.default_reserve_bytes))
                     required_bytes = int(upload_size * disk_multiplier) + reserve_bytes
@@ -307,4 +315,5 @@ class OrganizationSubdomainMiddleware(object):
         if hasattr(request, 'organization') and 'logo_override_image' not in response.context_data:
             # inject the logo override image into the template context
             response.context_data['logo_override_image'] = request.organization.logo_override_image
+            response.context_data['organization_logo'] = request.organization.logo
         return response

@@ -2,10 +2,10 @@
 Django settings for dmoj project.
 
 For more information on this file, see
-https://docs.djangoproject.com/en/4.2/topics/settings/
+https://docs.djangoproject.com/en/5.2/topics/settings/
 
 For the full list of settings and their values, see
-https://docs.djangoproject.com/en/4.2/ref/settings/
+https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -19,7 +19,7 @@ from jinja2 import select_autoescape
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 # Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
+# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = '5*9f5q57mqmlz2#f$x1h76&jxy#yortjl1v+l*6hd18$d*yx#0'
@@ -124,9 +124,10 @@ CELERY_TIMEZONE = 'UTC'
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 3000
 
 # Upload temp storage and safety headroom check (used by AutoProblemUploadGuardMiddleware).
+# AutoProblem holds the uploaded package and staged testcase ZIPs concurrently.
 # Resolved after loading local settings so it can follow MEDIA_ROOT overrides.
 FILE_UPLOAD_TEMP_DIR = None
-AUTOPROBLEM_UPLOAD_DISK_MULTIPLIER = 1.15
+AUTOPROBLEM_UPLOAD_DISK_MULTIPLIER = 2.15
 AUTOPROBLEM_UPLOAD_DISK_RESERVE_BYTES = 1024 * 1024 * 1024
 # Number of concurrent workers used for per-problem phase-3 processing in autoproblem upload.
 # Runtime clamps this value to [1, 10] for safety.
@@ -687,7 +688,7 @@ SUBMISSION_FILE_UPLOAD_URL_PREFIX = '/submission_file'
 SUBMISSION_FILE_UPLOAD_MEDIA_DIR = 'submission_file'
 
 # Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
     'default': {
@@ -718,7 +719,7 @@ EVENT_DAEMON_SUBMISSION_KEY = '6Sdmkx^%pk@GsifDfXcwX*Y7LRF%RGT8vmFpSxFBT$fwS7trc
 EVENT_DAEMON_CONTEST_KEY = '&w7hB-.9WnY2Jj^Qm+|?o6a<!}_2Wiw+?(_Yccqq{uR;:kWQP+3R<r(ICc|4^dDeEuJE{*D;Gg@K(4K>'
 
 # Internationalization
-# https://docs.djangoproject.com/en/4.2/topics/i18n/
+# https://docs.djangoproject.com/en/5.2/topics/i18n/
 
 # Whatever you do, this better be one of the entries in `LANGUAGES`.
 LANGUAGE_CODE = 'en'
@@ -731,7 +732,7 @@ USE_TZ = True
 SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
+# https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 DMOJ_RESOURCES = os.path.join(BASE_DIR, 'resources')
 STATICFILES_FINDERS = (
@@ -811,13 +812,25 @@ try:
 except IOError:
     pass
 
-# Keep upload temp path deployment-agnostic by deriving from MEDIA_ROOT.
+# Keep upload temp paths deployment-agnostic by deriving from MEDIA_ROOT.
 if not globals().get('MEDIA_ROOT'):
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 if not globals().get('MEDIA_URL'):
     MEDIA_URL = '/media/'
+
+# Navbar logos must remain on this server even when DEFAULT_FILE_STORAGE points
+# to S3-compatible storage. They are served through the local_logo URL below.
+if not globals().get('LOCAL_LOGO_ROOT'):
+    LOCAL_LOGO_ROOT = os.path.join(MEDIA_ROOT, 'navbar_logos')
+
 FILE_UPLOAD_TEMP_DIR = os.path.join(MEDIA_ROOT, 'upload_tmp')
 os.makedirs(FILE_UPLOAD_TEMP_DIR, exist_ok=True)
+
+# AutoProblem keeps an archive and its per-problem ZIP files while it creates
+# the problems. Keep them with Django's disk-backed uploads, not in /tmp,
+# which may be a small tmpfs even when MEDIA_ROOT has plenty of free space.
+AUTOPROBLEM_TEMP_DIR = globals().get('AUTOPROBLEM_TEMP_DIR') or FILE_UPLOAD_TEMP_DIR
+os.makedirs(AUTOPROBLEM_TEMP_DIR, exist_ok=True)
 
 USE_X_FORWARDED_HOST = True
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024 * 1024  # 10GB

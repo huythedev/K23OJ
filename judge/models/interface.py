@@ -1,7 +1,9 @@
 import re
+import secrets
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.db.models import CASCADE
 from django.urls import reverse
@@ -11,8 +13,9 @@ from mptt.fields import TreeForeignKey
 from mptt.models import MPTTModel
 
 from judge.models.profile import Organization, Profile
+from judge.utils.logo_storage import local_logo_storage
 
-__all__ = ['MiscConfig', 'validate_regex', 'NavigationBar', 'BlogPost']
+__all__ = ['MiscConfig', 'validate_regex', 'NavigationBar', 'SiteBranding', 'BlogPost']
 
 
 class MiscConfig(models.Model):
@@ -25,6 +28,35 @@ class MiscConfig(models.Model):
     class Meta:
         verbose_name = _('configuration item')
         verbose_name_plural = _('miscellaneous configuration')
+
+
+def site_logo_upload_path(instance, filename):
+    """Store site logos under a non-guessable, PNG-only filename."""
+    return 'site_logos/%s.png' % secrets.token_hex(16)
+
+
+class SiteBranding(models.Model):
+    site = models.OneToOneField(
+        'sites.Site',
+        verbose_name=_('site'),
+        related_name='branding',
+        on_delete=models.CASCADE,
+    )
+    logo = models.ImageField(
+        verbose_name=_('site logo'),
+        upload_to=site_logo_upload_path,
+        storage=local_logo_storage,
+        blank=True,
+        validators=[FileExtensionValidator(allowed_extensions=['png'])],
+        help_text=_('Upload a PNG image for the navbar. Clear it to restore the default site logo.'),
+    )
+
+    def __str__(self):
+        return _('%s branding') % self.site.name
+
+    class Meta:
+        verbose_name = _('site branding')
+        verbose_name_plural = _('site branding')
 
 
 def validate_regex(regex):
