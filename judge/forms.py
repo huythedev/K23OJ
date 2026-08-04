@@ -714,6 +714,7 @@ class ProblemSubmitForm(ModelForm):
 
 class TagProblemCreateForm(Form):
     problem_url = forms.URLField(max_length=200,
+                                 assume_scheme='https',
                                  label=_('Problem URL'),
                                  help_text=_('Full URL to the problem, '
                                              'e.g. https://oj.vnoi.info/problem/post'),

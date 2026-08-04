@@ -71,7 +71,7 @@ class TestcaseDownloadLogAdmin(admin.ModelAdmin):
     list_filter = ('download_source', 'file_type', 'downloaded_at')
     search_fields = ('requester__user__username', 'problem__code', 'problem__name', '=submission__id', 'ip_address')
     list_select_related = ('requester__user', 'problem', 'submission', 'testcase')
-#     date_hierarchy = 'downloaded_at'
+    date_hierarchy = 'downloaded_at'
     list_display_links = None
     actions = None
 
