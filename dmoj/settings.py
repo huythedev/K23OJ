@@ -812,6 +812,22 @@ try:
 except IOError:
     pass
 
+# DEFAULT_FILE_STORAGE was removed in Django 5.1. Keep existing deployments
+# that configure it in local_settings.py working while they migrate to the
+# supported STORAGES setting. Without this, uploads silently use local disk.
+if 'STORAGES' not in globals() and globals().get('DEFAULT_FILE_STORAGE'):
+    STORAGES = {
+        'default': {
+            'BACKEND': DEFAULT_FILE_STORAGE,
+        },
+        'staticfiles': {
+            'BACKEND': globals().get(
+                'STATICFILES_STORAGE',
+                'django.contrib.staticfiles.storage.StaticFilesStorage',
+            ),
+        },
+    }
+
 # Keep upload temp paths deployment-agnostic by deriving from MEDIA_ROOT.
 if not globals().get('MEDIA_ROOT'):
     MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
