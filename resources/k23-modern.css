@@ -2,54 +2,75 @@
    This layer deliberately sits above the legacy theme bundles so the product can
    evolve without coupling the problem-solving experience to a side-by-side UI. */
 :root {
-    --k23-bg: #fffefd;
-    --k23-surface: #fffefd;
-    --k23-surface-raised: #fffefd;
-    --k23-border: #e7dac5;
-    --k23-text: #27231d;
-    --k23-muted: #6b6256;
-    --k23-accent: #7c8cff;
-    --k23-accent-bright: #5869dc;
+    --k23-accent: #4f46e5;
+    --k23-accent-hover: #4338ca;
+    --k23-accent-active: #3730a3;
+    --k23-accent-tint: #eef0ff;
+    --k23-accent-bright: var(--k23-accent-hover);
+    --k23-tint: var(--k23-accent-tint);
+
+    --k23-border: #cdcdd6;
+    --k23-border-subtle: #e6e6ec;
+
+    --k23-text: #18181b;
+    --k23-muted: #5b6070;
+
+    --k23-page: #ffffff;
+    --k23-bg: var(--k23-page);
+    --k23-surface: #ffffff;
+    --k23-surface-raised: #f2f2f6;
+    --k23-inset: #f2f2f6;
+
     --k23-success: #35d49a;
     --k23-warning: #ffc857;
     --k23-danger: #ff7185;
     --k23-radius: 16px;
-    --k23-page: #fffefd;
-    --k23-dock: #fffefd;
-    --k23-tint: rgba(88, 105, 220, .09);
-    --k23-row: #fffefd;
-    --k23-row-hover: #fff4df;
-    --k23-points: #8a5a00;
-    --k23-active-text: #000000;
-    --k23-selected-bg: #ffffff;
-    --k23-selected-text: #000000;
-    --k23-selected-hover-bg: #000000;
+    --k23-dock: var(--k23-surface-raised);
+    --k23-row: var(--k23-surface);
+    --k23-row-hover: var(--k23-surface-raised);
+    --k23-points: #7c3f00;
+    --k23-active-text: var(--k23-accent-active);
+    --k23-selected-bg: var(--k23-accent-tint);
+    --k23-selected-text: var(--k23-accent-active);
+    --k23-selected-hover-bg: var(--k23-accent-hover);
     --k23-selected-hover-text: #ffffff;
+    --k23-control-focus: rgba(79, 70, 229, .28);
     --k23-shadow: rgba(26, 40, 76, .12);
-    --k23-menu: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
+    --k23-menu: #1c1f33;
 }
 
 html[data-k23-theme="dark"] {
-    --k23-bg: #0f172a;
-    --k23-surface: #161b22;
-    --k23-surface-raised: #1e293b;
-    --k23-border: #334155;
-    --k23-text: #f8fafc;
-    --k23-muted: #94a3b8;
     --k23-accent: #6366f1;
-    --k23-accent-bright: #818cf8;
+    --k23-accent-hover: #7c83f7;
+    --k23-accent-active: #4f46e5;
+    --k23-accent-tint: rgba(99, 102, 241, .18);
+    --k23-accent-bright: var(--k23-accent-hover);
+    --k23-tint: var(--k23-accent-tint);
+
+    --k23-border: #3a4a63;
+    --k23-border-subtle: #2b3a52;
+
+    --k23-text: #f8fafc;
+    --k23-muted: #9aa8bd;
+
     --k23-page: #0f172a;
-    --k23-dock: #161b22;
-    --k23-tint: rgba(99, 102, 241, .14);
-    --k23-row: #161b22;
-    --k23-row-hover: #21262d;
+    --k23-bg: var(--k23-page);
+    --k23-surface: #1c2536;
+    --k23-surface-raised: #26334a;
+    --k23-inset: #141c2b;
+
+    --k23-dock: var(--k23-surface-raised);
+    --k23-row: var(--k23-surface);
+    --k23-row-hover: var(--k23-surface-raised);
     --k23-points: #c7d2fe;
-    --k23-selected-bg: #6366f1;
-    --k23-selected-text: #f8fafc;
-    --k23-selected-hover-bg: #818cf8;
-    --k23-selected-hover-text: #f8fafc;
+    --k23-active-text: var(--k23-accent-active);
+    --k23-selected-bg: var(--k23-accent-tint);
+    --k23-selected-text: #c7d2fe;
+    --k23-selected-hover-bg: var(--k23-accent-active);
+    --k23-selected-hover-text: #ffffff;
+    --k23-control-focus: rgba(129, 140, 248, .32);
     --k23-shadow: rgba(2, 6, 23, .16);
-    --k23-menu: #161b22;
+    --k23-menu: #151b2a;
 }
 
 html {
@@ -69,7 +90,7 @@ body {
     border-color: var(--k23-border);
     box-shadow: none;
 }
-footer { background: var(--k23-page); }
+footer { background: var(--k23-page); border-color: var(--k23-border-subtle); }
 
 #content { width: min(94%, 96rem); padding-top: 2.25rem; }
 #content > h2, .problem-title {
@@ -83,18 +104,35 @@ footer { background: var(--k23-page); }
     box-shadow: none;
 }
 .sidebox-content { border: 0; }
+.sidebox h3,
+.sidebox h3 a,
+.sidebox h3 .fa {
+    background: var(--k23-surface-raised);
+    color: var(--k23-text);
+}
+.sidebox h3 { border-bottom: 1px solid var(--k23-border-subtle); }
+.sidebox #filter-form {
+    margin: 0;
+    padding: .75rem 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
 .h-scrollable-table > .table { margin-bottom: 0; }
 .table th {
     color: var(--k23-muted);
-    background: var(--k23-tint);
-    border-bottom: 1px solid var(--k23-border);
+    background: var(--k23-surface-raised);
+    border-bottom: 1px solid var(--k23-border-subtle);
 }
 .contest-list.table thead th a.contest-sort-link {
     color: inherit;
 }
-.table td { border-color: var(--k23-border); }
+.table td { border-color: var(--k23-border-subtle); }
+.table.striped tr:nth-child(2n) { background: var(--k23-surface-raised); }
 .table tbody tr { transition: background .18s ease; }
-.table tbody tr:hover { background: var(--k23-tint); }
+.table tbody tr:hover,
+.table.striped tbody tr:hover { background: var(--k23-accent-tint); }
 
 .users-table { margin-bottom: 0; }
 .users-table th a,
@@ -115,25 +153,9 @@ footer { background: var(--k23-page); }
 #ranking-table th a:hover { color: var(--k23-accent-bright); }
 #ranking-table .point-denominator {
     color: var(--k23-muted);
-    border-top-color: var(--k23-border);
+    border-top-color: var(--k23-border-subtle);
 }
 #judge-versions tr:first-child { position: static; }
-
-.button, input[type="submit"].button {
-    background: linear-gradient(135deg, var(--k23-accent), var(--k23-accent-bright));
-    border: 1px solid transparent;
-    border-radius: 10px;
-    color: var(--k23-selected-hover-text);
-    font-weight: 700;
-    letter-spacing: .01em;
-    box-shadow: none;
-    transition: background .18s ease, border-color .18s ease, filter .18s ease;
-}
-.button:hover, input[type="submit"].button:hover {
-    color: var(--k23-selected-hover-text);
-    filter: brightness(1.08);
-    border-color: var(--k23-accent-bright);
-}
 
 .problem-primary-actions { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
 .problem-primary-actions > div:not(.submissions-left) { padding: 0; background: none; }
@@ -174,7 +196,7 @@ footer { background: var(--k23-page); }
 #problem-table td.problem-code { color: var(--k23-accent-bright); font-size: .78rem; font-weight: 750; }
 #problem-table td.problem-name { font-size: 1.04rem; font-weight: 720; }
 #problem-table td.category, #problem-table td.types { color: var(--k23-muted); font-size: .86rem; }
-#problem-table .type-tag { display: inline-block; padding: .18rem .48rem; margin: .1rem; border-radius: 999px; background: var(--k23-tint); color: var(--k23-accent-bright); }
+#problem-table .type-tag { display: inline-block; padding: .18rem .48rem; margin: .16rem .22rem .16rem 0; border-radius: 999px; background: var(--k23-tint); color: var(--k23-selected-text); }
 #problem-table td.p { color: var(--k23-points); font-weight: 750; }
 
 /* Tabs now behave as compact view switchers across problems, submissions and
@@ -183,22 +205,24 @@ footer { background: var(--k23-page); }
 .tabs ul { display: flex; flex-wrap: wrap; gap: .35rem; padding: .35rem !important; border: 1px solid var(--k23-border); border-radius: 12px; background: var(--k23-dock); }
 .tabs li { list-style: none; }
 .tabs li a, .tabs li span { display: block; padding: .48rem .72rem; border-radius: 8px; color: var(--k23-muted); font-size: .86rem; font-weight: 650; }
-.tabs li.active a, .tabs li.active span,
-.button.active, .button.selected,
-button.active, button.selected,
-input[type="submit"].active, input[type="submit"].selected,
-input[type="button"].active, input[type="button"].selected {
+.tabs > ul > li.active > a,
+.tabs > ul > li.active > span,
+.tabs > ul > li.tab.active > a,
+.tabs > ul > li.tab.active > span {
     color: var(--k23-selected-text);
     background: var(--k23-selected-bg);
 }
-.tabs li.active a:hover, .tabs li.active span:hover,
-.button.active:hover, .button.selected:hover,
-button.active:hover, button.selected:hover,
-input[type="submit"].active:hover, input[type="submit"].selected:hover,
-input[type="button"].active:hover, input[type="button"].selected:hover {
+.tabs > ul > li.active > a:hover,
+.tabs > ul > li.active > span:hover,
+.tabs > ul > li.tab.active > a:hover,
+.tabs > ul > li.tab.active > span:hover {
     color: var(--k23-selected-hover-text);
     background: var(--k23-selected-hover-bg);
-    filter: none;
+}
+.tabs li a:focus-visible,
+.tabs li span:focus-visible {
+    outline: 0;
+    box-shadow: 0 0 0 3px var(--k23-control-focus);
 }
 
 /* Submission history: each row reads as a compact activity card and verdicts
@@ -210,7 +234,7 @@ input[type="button"].active:hover, input[type="button"].selected:hover {
     box-shadow: none; transition: background .18s ease, border-color .18s ease;
 }
 .submission-row:hover { border-color: var(--k23-accent) !important; background: var(--k23-row-hover); }
-.submission-row > div { border-color: var(--k23-border) !important; }
+.submission-row > div { border-color: var(--k23-border-subtle) !important; }
 .submission-row .sub-result {
     min-width: 5.8rem;
     width: 5.8rem;
@@ -230,54 +254,49 @@ input[type="button"].active:hover, input[type="button"].selected:hover {
 .submission-row .sub-result.CE .status { color: #f8fafc; background: #4b5563; }
 .submission-row .score { color: var(--k23-text) !important; font-weight: 750; }
 
-/* Keep navigation in the same slate hierarchy as the page instead of using a
-   separate, high-contrast gradient. Borders do the separation work. */
-html[data-k23-theme="dark"] #nav-background,
-html[data-k23-theme="dark"] #nav-container,
-html[data-k23-theme="dark"] nav,
-html[data-k23-theme="dark"] #navigation,
-html[data-k23-theme="dark"] #nav-list {
+/* One flat navigation surface is shared by desktop, dropdown, and drawer UI. */
+#nav-background,
+#nav-container,
+nav,
+#navigation,
+#nav-list,
+nav ul li ul {
     background: var(--k23-menu);
-    border-color: var(--k23-border);
     box-shadow: none;
 }
-html[data-k23-theme="dark"] nav {
-    border-bottom: 1px solid var(--k23-border);
+nav,
+#nav-container {
+    border-bottom-color: rgba(255, 255, 255, .12);
 }
-html[data-k23-theme="dark"] #user-links a,
-html[data-k23-theme="dark"] nav ul li a,
-html[data-k23-theme="dark"] nav ul li button {
-    color: var(--k23-text);
+nav ul li ul,
+#nav-list {
+    border-color: rgba(255, 255, 255, .12);
 }
-html[data-k23-theme="dark"] nav ul li a:hover,
-html[data-k23-theme="dark"] nav ul li button:hover,
-html[data-k23-theme="dark"] #user-links > ul > li > a > span:hover {
-    background: #21262d;
-    color: var(--k23-text);
+#user-links a,
+nav ul li a,
+nav ul li button,
+#navicon {
+    color: rgba(255, 255, 255, .92);
 }
-html[data-k23-theme="dark"] nav ul li a.active,
-html[data-k23-theme="dark"] nav ul li button.active {
-    background: var(--k23-surface-raised);
+nav ul li a:hover,
+nav ul li button:hover,
+#user-links > ul > li > a > span:hover,
+#navicon:hover,
+#navicon.hover {
+    background: rgba(255, 255, 255, .10);
+    color: #ffffff;
+}
+nav ul li a.active,
+nav ul li button.active {
+    background: rgba(255, 255, 255, .10);
     border-bottom-color: var(--k23-accent);
 }
-html[data-k23-theme="dark"] nav ul li ul {
-    background: var(--k23-surface);
-    border-color: var(--k23-border);
-    box-shadow: none;
-}
-html[data-k23-theme="dark"] nav ul li ul li a.active,
-html[data-k23-theme="dark"] nav ul li ul li a:hover,
-html[data-k23-theme="dark"] nav ul li ul li button:hover {
-    background: #21262d;
+nav ul li ul li a.active,
+nav ul li ul li button.active,
+nav ul li ul li a:hover,
+nav ul li ul li button:hover {
+    background: rgba(255, 255, 255, .10);
     border-left-color: var(--k23-accent);
-}
-html[data-k23-theme="dark"] #navicon {
-    color: var(--k23-text);
-}
-html[data-k23-theme="dark"] #navicon:hover,
-html[data-k23-theme="dark"] #navicon.hover {
-    color: var(--k23-accent-bright);
-    background: #21262d;
 }
 html[data-k23-theme="dark"] h1,
 html[data-k23-theme="dark"] h2 {
@@ -287,52 +306,54 @@ html[data-k23-theme="dark"] h3,
 html[data-k23-theme="dark"] h4 {
     color: #e2e8f0;
 }
-html[data-k23-theme="dark"] .sidebox h3,
-html[data-k23-theme="dark"] .sidebox h3 a,
-html[data-k23-theme="dark"] .sidebox h3 .fa {
-    background: var(--k23-surface-raised);
-    color: #f1f5f9;
-}
-html[data-k23-theme="dark"] .sidebox h3 {
-    border-bottom: 1px solid var(--k23-border);
-}
-html[data-k23-theme="dark"] pre,
-html[data-k23-theme="dark"] .source-wrap {
-    background: var(--k23-surface-raised);
+pre,
+.source-wrap {
+    background: var(--k23-inset);
     border-color: var(--k23-border);
 }
-html[data-k23-theme="dark"] input[type="text"],
-html[data-k23-theme="dark"] input[type="password"],
-html[data-k23-theme="dark"] input[type="email"],
-html[data-k23-theme="dark"] input[type="number"],
-html[data-k23-theme="dark"] input[type="url"],
-html[data-k23-theme="dark"] textarea,
-html[data-k23-theme="dark"] select {
+.content-description code,
+.content-description span.code,
+.martor-preview code,
+.martor-preview span.code {
+    background: var(--k23-inset);
+    border-color: var(--k23-border-subtle);
+}
+.source-code pre,
+.source-ln pre {
+    background: transparent;
+}
+input[type="text"]:not(.select2-search__field),
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="url"],
+textarea,
+select {
     background: var(--k23-surface);
     border-color: var(--k23-border);
     box-shadow: none;
     color: var(--k23-text);
 }
-html[data-k23-theme="dark"] input[type="text"]:focus,
-html[data-k23-theme="dark"] input[type="password"]:focus,
-html[data-k23-theme="dark"] input[type="email"]:focus,
-html[data-k23-theme="dark"] input[type="number"]:focus,
-html[data-k23-theme="dark"] input[type="url"]:focus,
-html[data-k23-theme="dark"] textarea:focus,
-html[data-k23-theme="dark"] select:focus {
+input[type="text"]:not(.select2-search__field):focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+input[type="url"]:focus,
+textarea:focus,
+select:focus {
     border-color: var(--k23-accent);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, .2);
+    box-shadow: 0 0 0 3px var(--k23-control-focus);
 }
 
 /* Hidden and private contest labels are supporting metadata, not alerts. */
 html[data-k23-theme="dark"] .contest-tag.contest-tag-secondary {
-    background: #334155 !important;
-    color: #e2e8f0 !important;
-    border: 1px solid #475569;
+    background: var(--k23-surface-raised) !important;
+    color: var(--k23-text) !important;
+    border: 1px solid var(--k23-border);
     box-shadow: none;
 }
 html[data-k23-theme="dark"] .contest-tag.contest-tag-secondary a {
-    color: #e2e8f0 !important;
+    color: var(--k23-text) !important;
 }
 
 @media (max-width: 760px) {
@@ -342,7 +363,7 @@ html[data-k23-theme="dark"] .contest-tag.contest-tag-secondary a {
     .submit-workspace-header { flex-direction: column; align-items: flex-start; }
     .submit-bar { align-items: stretch; flex-direction: column; }
     .submission-row .sub-result { min-width: 4.6rem; width: 4.6rem; }
-    .tabs { align-items: flex-start; flex-direction: column; }
+    .tabs { align-items: flex-start !important; flex-direction: column; }
     .tabs ul { width: 100%; box-sizing: border-box; overflow-x: auto; flex-wrap: nowrap; }
     .problem-browser-layout { display: flex; flex-direction: column; }
     #content-left.problems { order: 1; }

@@ -83,6 +83,7 @@ form .martor-preview {
             background: transparent !important;
             color: $color_primary66 !important;
             box-shadow: none !important;
+            height: auto;
             margin: 0 !important;
             padding: 0.5em !important;
 
@@ -255,6 +256,10 @@ body.overflow {
     overflow: hidden !important;
 }
 
-.button, input[type=submit], input[type=button], .submit-row input, a.button {
+.submit-row .button,
+.submit-row input[type=submit],
+.submit-row input[type=button],
+.submit-row input,
+.submit-row a.button {
     padding: 5px 15px;
 }

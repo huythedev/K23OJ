@@ -1,4 +1,3 @@
-@use "sass:color";
 @use "vars" as *;
 
 .social i {
@@ -29,197 +28,377 @@
     float: right;
 }
 
-// Modern Button Styles
-.button, button, input[type=submit] {
-    color: white !important;
+// Canonical K23OJ button system
+.button, button, input[type=submit], input[type=button] {
+    box-sizing: border-box;
+    height: 40px;
+    padding: 0 18px;
+    border: 1px solid $k23-accent;
+    border-radius: 10px;
+    background: $k23-accent;
+    color: white;
     text-decoration: none !important;
     cursor: pointer;
     vertical-align: middle;
     white-space: nowrap;
-    font-weight: 500;
-    line-height: 1.5;
-    background: linear-gradient(135deg, $highlight_blue 0%, $highlight_blue_dark 100%);
-    border-radius: $widget_border_radius;
-    padding: $spacing-3 $spacing-5;
-    display: inline-block;
-    border: 0;
+    font-weight: 650;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     text-align: center;
     font-size: $base_font_size;
     font-family: $font-family-sans;
-    box-shadow: $shadow-sm;
-    transition: all $transition-fast;
-    position: relative;
-    overflow: hidden;
-
-    &::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 100%);
-        opacity: 0;
-        transition: opacity $transition-fast;
-    }
+    box-shadow: none;
+    transition: background 0.12s, border-color 0.12s;
 
     &:hover {
-        background: linear-gradient(135deg, $highlight_blue_light 0%, $highlight_blue 100%);
-        box-shadow: $shadow-md;
-        transform: translateY(-1px);
-        
-        &::before {
-            opacity: 1;
-        }
+        background: $k23-accent-hover;
+        border-color: $k23-accent-hover;
+        color: white;
     }
 
     &:active {
-        transform: translateY(0);
-        box-shadow: $shadow-sm;
+        background: $k23-accent-active;
+        border-color: $k23-accent-active;
+        color: white;
+        transform: translateY(1px);
     }
 
-    &.full {
-        padding: $spacing-3 0;
-        width: 100%;
+    &:focus-visible {
+        outline: 0;
+        box-shadow: 0 0 0 3px $k23-accent-focus-ring;
     }
 
-    &.disabled {
-        background: linear-gradient(135deg, $color_primary33 0%, $color_primary50 100%) !important;
+    &:disabled, &[disabled], &.disabled {
+        background: $k23-primary-disabled-bg;
+        border-color: $k23-primary-disabled-border;
+        color: $k23-primary-disabled-text;
         cursor: not-allowed;
-        opacity: 0.7;
         box-shadow: none;
         transform: none;
     }
 }
 
 // Secondary button variant
-.button-secondary {
-    background: $color_primary0 !important;
-    color: $color_primary75 !important;
-    border: 1px solid $color_primary25;
+.button-secondary,
+input[type=submit].button-secondary,
+input[type=button].button-secondary {
+    background: $k23-surface;
+    border-color: $k23-border;
+    color: $k23-secondary-text;
     
     &:hover {
-        background: $color_primary5 !important;
-        border-color: $color_primary33;
+        background: $k23-secondary-hover-bg;
+        border-color: $k23-secondary-hover-border;
+        color: $k23-secondary-text;
+    }
+
+    &:active {
+        background: $k23-secondary-active-bg;
+        border-color: $k23-secondary-active-border;
+        color: $k23-secondary-text;
+    }
+
+    &:focus-visible {
+        border-color: $k23-accent;
+        box-shadow: 0 0 0 3px $k23-control-focus-ring;
+    }
+
+    &:disabled, &[disabled], &.disabled {
+        background: $k23-secondary-disabled-bg;
+        border-color: $k23-secondary-disabled-border;
+        color: $k23-secondary-disabled-text;
     }
 }
 
-// Danger button variant  
-.button-danger {
-    background: linear-gradient(135deg, $color_danger100 0%, color.adjust($color_danger100, $lightness: -10%) 100%) !important;
-    
+// Solid danger button variant
+.button-danger,
+#delete-button,
+.webauthn-delete,
+.remove-contest-form-button,
+.contest-moss-delete,
+input[type=submit].button-danger,
+input[type=button].button-danger,
+input[type=submit].contest-moss-delete {
+    background: $k23-danger;
+    border-color: $k23-danger;
+    color: white;
+
     &:hover {
-        background: linear-gradient(135deg, color.adjust($color_danger100, $lightness: 5%) 0%, $color_danger100 100%) !important;
+        background: $k23-danger-hover;
+        border-color: $k23-danger-hover;
+        color: white;
+    }
+
+    &:active {
+        background: $k23-danger-active;
+        border-color: $k23-danger-active;
+    }
+
+    &:focus-visible {
+        box-shadow: 0 0 0 3px $k23-danger-focus-ring;
+    }
+
+    &:disabled, &[disabled], &.disabled {
+        background: $k23-primary-disabled-bg;
+        border-color: $k23-primary-disabled-border;
+        color: $k23-primary-disabled-text;
     }
 }
 
-.inline-button {
-    display: inline;
+// CSS-only outlined/subtle danger option for lower-emphasis destructive actions.
+.button-danger-subtle,
+.exam-manage-danger,
+input[type=submit].button-danger-subtle,
+input[type=button].button-danger-subtle {
+    background: $k23-danger-subtle-bg;
+    border-color: $k23-danger-subtle-border;
+    color: $k23-danger-subtle-text;
+
+    &:hover {
+        background: $k23-secondary-hover-bg;
+        border-color: $k23-danger-subtle-border;
+        color: $k23-danger-subtle-text;
+    }
+
+    &:active {
+        background: $k23-secondary-active-bg;
+        border-color: $k23-danger-subtle-border;
+        color: $k23-danger-subtle-text;
+    }
+
+    &:focus-visible {
+        box-shadow: 0 0 0 3px $k23-danger-focus-ring;
+    }
+
+    &:disabled, &[disabled], &.disabled {
+        background: $k23-secondary-disabled-bg;
+        border-color: $k23-secondary-disabled-border;
+        color: $k23-secondary-disabled-text;
+    }
+}
+
+.button-ghost,
+input[type=submit].button-ghost,
+input[type=button].button-ghost {
+    padding: 0 14px;
+    background: transparent;
+    border-color: transparent;
+    color: $k23-ghost-text;
+
+    &:hover {
+        background: $k23-ghost-hover-bg;
+        border-color: transparent;
+        color: $k23-ghost-hover-text;
+    }
+
+    &:active {
+        background: $k23-ghost-active-bg;
+        border-color: transparent;
+        color: $k23-ghost-active-text;
+    }
+
+    &:disabled, &[disabled], &.disabled {
+        background: transparent;
+        border-color: transparent;
+        color: $k23-ghost-disabled-text;
+    }
+}
+
+.inline-button,
+input[type=submit].inline-button,
+input[type=button].inline-button {
+    display: inline-flex;
     vertical-align: top;
-    padding: $spacing-2 $spacing-3;
-    font-size: 0.9em;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 8px;
+    font-size: 13px;
 }
 
-// Modern Input Styles
-input {
-    &[type=text], &[type=password], &[type=email], &[type=number], &[type=url] {
-        padding: $spacing-3 $spacing-4;
-        color: $color_primary75;
-        background: $color_primary0 none;
-        border: 1px solid $color_primary25;
-        border-radius: $widget_border_radius;
-        box-shadow: $shadow-xs;
-        transition: all $transition-fast;
-        box-sizing: border-box;
-        font-size: $base_font_size;
-        font-family: $font-family-sans;
+.button-sm,
+input[type=submit].button-sm,
+input[type=button].button-sm {
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 8px;
+    font-size: 13px;
+}
 
-        &:hover {
-            border-color: $color_primary33;
-            box-shadow: $shadow-sm;
-        }
+.button-lg,
+input[type=submit].button-lg,
+input[type=button].button-lg {
+    height: 48px;
+    padding: 0 24px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+}
 
-        &:focus {
-            border-color: $highlight_blue;
-            box-shadow: 0 0 0 3px rgba($highlight_blue, 0.15);
-            outline: 0;
-        }
-        
-        &::placeholder {
-            color: $color_primary33;
-        }
-    }
+.button-full,
+.button.full {
+    width: 100%;
+}
 
-    &[type=number] {
-        padding: $spacing-2 0 $spacing-2 $spacing-3;
-    }
+// These legacy MOSS controls carry inline padding in their template. Keep the
+// canonical button geometry without changing that markup.
+input[type=submit].button.contest-moss,
+input[type=submit].button.contest-moss-delete {
+    padding: 0 18px !important;
+}
 
-    &[type=checkbox] {
-        appearance: none;
-        -webkit-appearance: none;
-        vertical-align: middle;
-        border: 2px solid $color_primary33;
-        background: $color_primary0;
-        border-radius: $widget_border_radius_sm;
-        width: 1.1em;
-        height: 1.1em;
-        cursor: pointer;
-        transition: all $transition-fast;
-        position: relative;
-
-        &:hover {
-            border-color: $highlight_blue;
-        }
-
-        &:checked {
-            background: $highlight_blue;
-            border-color: $highlight_blue;
-            
-            &::after {
-                content: '✓';
-                position: absolute;
-                color: white;
-                font-size: 0.75em;
-                font-weight: bold;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-            }
-        }
-        
-        &:focus {
-            box-shadow: 0 0 0 3px rgba($highlight_blue, 0.15);
-            outline: none;
-        }
+@keyframes k23spin {
+    to {
+        transform: rotate(360deg);
     }
 }
 
-// Modern Textarea
-textarea {
+a.button.loading:not(.ui):not(.disabled):not([disabled]),
+button.loading:not(.ui):not(.disabled):not(:disabled):not([disabled]) {
+    opacity: 0.85;
+    cursor: progress;
+}
+
+a.button.loading:not(.ui):not(.disabled):not([disabled])::before,
+button.loading:not(.ui):not(.disabled):not(:disabled):not([disabled])::before {
+    content: '';
+    display: block;
+    flex: 0 0 auto;
+    width: 13px;
+    height: 13px;
+    box-sizing: border-box;
+    border: 2px solid rgba(255, 255, 255, 0.85);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: k23spin 0.7s linear infinite;
+}
+
+// Navigation buttons keep their compact legacy geometry and do not inherit
+// primary-button press/focus effects.
+nav button {
+    font-weight: inherit;
+}
+
+nav button:active {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: transparent;
+    transform: none;
+}
+
+nav button:focus-visible {
+    outline: 2px solid $k23-accent;
+    outline-offset: -2px;
+    box-shadow: none;
+}
+
+// Modern form controls
+input[type=text],
+input[type=password],
+input[type=email],
+input[type=number],
+input[type=url],
+textarea,
+select {
     padding: $spacing-3 $spacing-4;
-    color: $color_primary75;
-    background: $color_primary0 none;
-    border: 1px solid $color_primary25;
+    color: $k23-text;
+    background: $k23-surface none;
+    border: 1px solid $k23-border;
     border-radius: $widget_border_radius;
-    box-shadow: $shadow-xs;
-    transition: all $transition-fast;
+    box-shadow: none;
+    transition: background 0.12s, border-color 0.12s;
     box-sizing: border-box;
     font-family: $font-family-sans;
     font-size: $base_font_size;
+
+    &:hover {
+        border-color: $k23-secondary-hover-border;
+    }
+
+    &:focus {
+        border-color: $k23-accent;
+        box-shadow: 0 0 0 3px $k23-control-focus-ring;
+        outline: 0;
+    }
+
+    &::placeholder {
+        color: $k23-muted;
+    }
+
+    &:disabled, &[disabled] {
+        background: $k23-surface-subtle;
+        color: $k23-muted;
+        cursor: not-allowed;
+    }
+}
+
+input[type=number] {
+    padding: $spacing-2 0 $spacing-2 $spacing-3;
+}
+
+select {
+    accent-color: $k23-accent;
+}
+
+textarea {
     line-height: 1.6;
     resize: vertical;
     min-height: 100px;
 }
 
-textarea:hover {
-    border-color: $color_primary33;
-    box-shadow: $shadow-sm;
+input[type=checkbox], input[type=radio] {
+    accent-color: $k23-accent;
 }
 
-textarea:focus {
-    border-color: $highlight_blue;
-    box-shadow: 0 0 0 3px rgba($highlight_blue, 0.15);
-    outline: 0;
+input[type=checkbox] {
+    appearance: none;
+    -webkit-appearance: none;
+    vertical-align: middle;
+    border: 2px solid $k23-border;
+    background: $k23-surface;
+    border-radius: $widget_border_radius_sm;
+    width: 1.1em;
+    height: 1.1em;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+    position: relative;
+
+    &:hover {
+        border-color: $k23-accent;
+    }
+
+    &:checked {
+        background: $k23-accent;
+        border-color: $k23-accent;
+
+        &::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 0.75em;
+            font-weight: bold;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+    }
+
+    &:focus-visible {
+        box-shadow: 0 0 0 3px $k23-control-focus-ring;
+        outline: none;
+    }
+
+    &:disabled, &[disabled] {
+        border-color: $k23-border-subtle;
+        background: $k23-surface-subtle;
+        cursor: not-allowed;
+    }
+}
+
+input[type=radio]:focus-visible {
+    outline: 2px solid $k23-accent;
+    outline-offset: 2px;
 }
 
 // Modern Copy Button
@@ -254,16 +433,15 @@ textarea:focus {
 
 // Modern Tabs
 .ul_tab_a_active {
-    color: $color_primary100;
-    background: $color_pageBg;
+    color: $k23-selected-text;
+    background: $k23-accent-tint;
     cursor: default;
-    border: 1px solid $color_primary25;
-    border-bottom-color: $color_pageBg;
+    border: 1px solid transparent;
     border-image: none;
 }
 
 .tabs {
-    border-bottom: 2px solid $color_primary25;
+    border-bottom: 0;
     margin: 0 0 $spacing-4;
     width: 100%;
     display: flex;
@@ -282,19 +460,20 @@ textarea:focus {
         }
 
         a, span {
-            border-top-width: 3px !important;
-            border-radius: $widget_border_radius $widget_border_radius 0 0;
+            border: 1px solid transparent !important;
+            border-radius: $widget_border_radius;
             transition: all $transition-fast;
         }
 
         &.active {
             a, span {
-                border-top-color: $highlight_blue !important;
-                background: $color_pageBg;
+                border-color: transparent !important;
+                background: $k23-accent-tint;
+                color: $k23-selected-text;
             }
 
             .tab-icon {
-                color: $color_primary100;
+                color: $k23-selected-text;
             }
         }
     }
@@ -332,11 +511,13 @@ textarea:focus {
                 margin-right: 2px;
                 line-height: 1.42857;
                 border: 1px solid transparent;
-                border-radius: $widget_border_radius $widget_border_radius 0 0;
+                border-radius: $widget_border_radius;
                 position: relative;
                 display: block;
-                padding: 10px 15px;
-                color: $color_primary66;
+                padding: 0.48rem 0.72rem;
+                color: $k23-muted;
+                font-size: 0.86rem;
+                font-weight: 650;
                 text-decoration: none;
                 white-space: nowrap;
             }

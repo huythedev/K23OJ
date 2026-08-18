@@ -4,13 +4,19 @@
 /* Hack to make dropdown background follow theming */
 .select2-dropdown {
     background-color: $color_primary0 !important;
-    border: 1px solid $color_primary33 !important;
+    border: 1px solid $k23-border !important;
     color: $color_primary100 !important;
 }
 
 .select2-container--dmoj {
     @include select2.single;
     @include select2.multiple;
+
+    &.select2-container--focus .select2-selection--single {
+        border-color: $k23-accent;
+        box-shadow: 0 0 0 3px $k23-control-focus-ring;
+        outline: 0;
+    }
 
     &.select2-container--open.select2-container--above {
         .select2-selection--single, .select2-selection--multiple {
@@ -28,7 +34,7 @@
 
     .select2-search--dropdown {
         .select2-search__field {
-            border: 1px solid $color_primary33;
+            border: 1px solid $k23-border;
             background-color: $color_select2_search_dropdown;
             color: $color_primary100;
         }

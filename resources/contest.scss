@@ -184,11 +184,55 @@ form.contest-join-pseudotab {
 
     input {
         display: inline;
+        height: auto;
+        min-height: 0;
         border: none;
         padding: 0;
         background: none;
         font-weight: 600;
     }
+
+    input:disabled {
+        background: none;
+        border: none;
+        color: inherit;
+    }
+}
+
+// Legacy registration controls include inline green gradients. Keep these
+// primary participation actions on the single interactive accent.
+form.contest-join-pseudotab.button,
+.button.register-warning {
+    background: $k23-accent !important;
+    border-color: $k23-accent !important;
+
+    &:hover {
+        background: $k23-accent-hover !important;
+        border-color: $k23-accent-hover !important;
+    }
+
+    &:active {
+        background: $k23-accent-active !important;
+        border-color: $k23-accent-active !important;
+    }
+}
+
+// The visible contest action is the form wrapper, while common.js disables its
+// nested submit input. Mirror that native disabled state on the wrapper.
+form.contest-join-pseudotab.button:has(> input:disabled) {
+    background: $k23-primary-disabled-bg !important;
+    border-color: $k23-primary-disabled-border !important;
+    color: $k23-primary-disabled-text !important;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.button.register-warning:disabled,
+.button.register-warning[disabled],
+.button.register-warning.disabled {
+    background: $k23-primary-disabled-bg !important;
+    border-color: $k23-primary-disabled-border !important;
+    color: $k23-primary-disabled-text !important;
 }
 
 .contest-participation-operation {
@@ -234,9 +278,9 @@ form.contest-join-pseudotab {
         display: block;
     }
 
-    /* Make problem table headers green on hover */
+    /* Ranking header links use the shared interactive accent on hover. */
     th a:hover {
-        color: #0F0;
+        color: $k23-accent-hover;
     }
 
     th a, th a:link, th a:visited {

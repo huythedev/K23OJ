@@ -130,24 +130,58 @@ div.ticket-title {
 .close-ticket, .vote-good {
     display: block;
     width: 100%;
-    background: linear-gradient(to bottom, #4bad00 0%, #278811 100%);
-    border-color: #24710e;
+    background: $k23-success-action;
+    border-color: $k23-success-action;
+    color: white;
     font-weight: 600;
 
     &:hover {
-        background: #24710e;
+        background: $k23-success-action-hover;
+        border-color: $k23-success-action-hover;
+    }
+
+    &:active {
+        background: $k23-success-action-active;
+        border-color: $k23-success-action-active;
+    }
+
+    &:focus-visible {
+        box-shadow: 0 0 0 3px $k23-success-action-focus-ring;
+    }
+
+    &:disabled, &[disabled], &.disabled {
+        background: $k23-primary-disabled-bg;
+        border-color: $k23-primary-disabled-border;
+        color: $k23-primary-disabled-text;
     }
 }
 
 .open-ticket, .vote-norm {
     display: block;
     width: 100%;
-    background: linear-gradient(to bottom, #ff130f, #b03d17);
-    border-color: #853011;
+    background: $k23-danger;
+    border-color: $k23-danger;
+    color: white;
     font-weight: 600;
 
     &:hover {
-        background: #853011;
+        background: $k23-danger-hover;
+        border-color: $k23-danger-hover;
+    }
+
+    &:active {
+        background: $k23-danger-active;
+        border-color: $k23-danger-active;
+    }
+
+    &:focus-visible {
+        box-shadow: 0 0 0 3px $k23-danger-focus-ring;
+    }
+
+    &:disabled, &[disabled], &.disabled {
+        background: $k23-primary-disabled-bg;
+        border-color: $k23-primary-disabled-border;
+        color: $k23-primary-disabled-text;
     }
 }
 

@@ -1,11 +1,11 @@
-// Modern Navbar with glassmorphism
-@use "vars-common" as *;
+// Modern Navbar
+@use "vars" as *;
 
 #user-links {
     top: 0;
     right: 0;
     position: absolute;
-    color: #5c5954;
+    color: #f4f4f5;
     padding-right: 16px;
     display: inline-flex;
     min-height: 100%;
@@ -76,7 +76,7 @@
     left: 0;
     width: 100%;
     height: 60px;
-    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
+    background: $k23-nav-background;
 }
 
 #nav-shadow {
@@ -84,7 +84,7 @@
 }
 
 #nav-container {
-    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
+    background: $k23-nav-background;
     height: 100%;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -95,7 +95,7 @@ nav {
     left: 0;
     right: 0;
     z-index: 500;
-    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
+    background: $k23-nav-background;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 
     ul {
@@ -148,7 +148,7 @@ nav {
                     color: #FFF;
                     background: rgba(255, 255, 255, 0.1);
                     border: none;
-                    border-bottom: 3px solid $highlight_blue;
+                    border-bottom: 3px solid $k23-accent;
                     padding: 16px 12px 13px 12px;
                     border-radius: $widget_border_radius_sm $widget_border_radius_sm 0 0;
                 }
@@ -164,9 +164,7 @@ nav {
                 left: 5px;
                 display: none;
                 color: #fff;
-                background: rgba(30, 27, 75, 0.95);
-                backdrop-filter: blur(12px);
-                -webkit-backdrop-filter: blur(12px);
+                background: $k23-nav-background;
                 margin: 0 !important;
                 box-shadow: $shadow-lg;
                 border-radius: $widget_border_radius;
@@ -176,7 +174,7 @@ nav {
                 li {
                     a.active {
                         border: none;
-                        border-left: 3px solid $highlight_blue;
+                        border-left: 3px solid $k23-accent;
                         background: rgba(255, 255, 255, 0.1);
                     }
                 }
@@ -196,7 +194,7 @@ nav {
                         transition: all $transition-fast;
                         
                         &:hover {
-                            border-left-color: $highlight_blue;
+                            border-left-color: $k23-accent;
                             background: rgba(255, 255, 255, 0.1);
                         }
                     }
@@ -256,12 +254,12 @@ nav {
 @media (max-width: 1100px) {
     #navigation {
         height: 44px;
-        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
+        background: $k23-nav-background;
     }
 
     #nav-container {
         height: 44px;
-        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
+        background: $k23-nav-background;
     }
 
     #navicon {
@@ -277,7 +275,7 @@ nav {
         border-radius: $widget_border_radius_sm;
 
         &:hover, &.hover {
-            color: $highlight_blue_light;
+            color: #FFF;
             background: rgba(255, 255, 255, 0.1);
         }
     }
@@ -288,7 +286,7 @@ nav {
         margin: 0;
         position: fixed;
         top: 44px;
-        background: #1e1b4b;
+        background: $k23-nav-background;
         bottom: 0;
         width: 14em;
         left: 0;
@@ -372,4 +370,3 @@ nav {
         border-radius: 0;
     }
 }
-

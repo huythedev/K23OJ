@@ -104,17 +104,8 @@
     border: 1px solid $color_primary25;
     box-shadow: $shadow-sm;
 
-    a {
+    a.button {
         margin-right: $spacing-2;
-        display: inline-block;
-        padding: $spacing-2 $spacing-4;
-        vertical-align: middle;
-        border-radius: $widget_border_radius;
-        transition: all $transition-fast;
-        
-        &:hover {
-            background: $color_primary5;
-        }
     }
 
     input {
@@ -292,11 +283,6 @@ ul.problem-list {
 
     .hidden {
         display: none;
-    }
-
-    .button {
-        display: inline-block !important;
-        padding: 6px 12px;
     }
 
     .submit-bar {

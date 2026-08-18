@@ -3,30 +3,86 @@
 
 $is_light_theme: true;
 
+// K23OJ semantic light-theme tokens
+$k23-accent: #4f46e5;
+$k23-accent-hover: #4338ca;
+$k23-accent-active: #3730a3;
+$k23-accent-tint: #eef0ff;
+$k23-selected-text: $k23-accent-active;
+$k23-accent-focus-ring: rgba(79, 70, 229, 0.34);
+$k23-control-focus-ring: rgba(79, 70, 229, 0.28);
+
+$k23-border: #cdcdd6;
+$k23-border-subtle: #e6e6ec;
+$k23-text: #18181b;
+$k23-muted: #5b6070;
+$k23-page: #ffffff;
+$k23-surface: #ffffff;
+$k23-surface-subtle: #f2f2f6;
+$k23-inset: #f2f2f6;
+$k23-points: #7c3f00;
+$k23-nav-background: #1c1f33;
+
+// Compatibility aliases used by the legacy theme components. Despite their
+// names, these are interactive-accent tokens, not semantic success colors.
+$highlight_blue: $k23-accent;
+$highlight_blue_light: $k23-accent-hover;
+$highlight_blue_dark: $k23-accent-active;
+
+// Button state tokens
+$k23-primary-disabled-bg: #ececf1;
+$k23-primary-disabled-border: #e2e2e9;
+$k23-primary-disabled-text: #a4a7b3;
+$k23-secondary-text: #2b2f3a;
+$k23-secondary-hover-bg: #f5f5f8;
+$k23-secondary-hover-border: #a9abb8;
+$k23-secondary-active-bg: #eaeaf0;
+$k23-secondary-active-border: #8f92a1;
+$k23-secondary-disabled-bg: #fafafc;
+$k23-secondary-disabled-border: #e6e6ec;
+$k23-secondary-disabled-text: #b4b7c2;
+$k23-danger: #dc2626;
+$k23-danger-hover: #b91c1c;
+$k23-danger-active: #991b1b;
+$k23-danger-focus-ring: rgba(220, 38, 38, 0.32);
+$k23-danger-subtle-bg: #ffffff;
+$k23-danger-subtle-border: #f0b4b4;
+$k23-danger-subtle-text: #dc2626;
+$k23-success-action: #15803d;
+$k23-success-action-hover: #166534;
+$k23-success-action-active: #14532d;
+$k23-success-action-focus-ring: rgba(22, 163, 74, 0.32);
+$k23-ghost-text: #4f46e5;
+$k23-ghost-hover-bg: #eef0ff;
+$k23-ghost-hover-text: #4f46e5;
+$k23-ghost-active-bg: #e0e3ff;
+$k23-ghost-active-text: #3730a3;
+$k23-ghost-disabled-text: #b4b7c2;
+
 // Modern Light Theme Colors
 $color_primary0: #ffffff;
-$color_primary5: #fafafa;   // light background
-$color_primary10: #f4f4f5;  // background
-$color_primary25: #e4e4e7;  // border
-$color_primary33: #a1a1aa;  // widget
-$color_primary50: #71717a;
-$color_primary66: #52525b;  // tabs
-$color_primary75: #3f3f46;  // widget
-$color_primary90: #27272a;
+$color_primary5: #f2f2f6;   // secondary surface
+$color_primary10: #f2f2f6;  // inset surface
+$color_primary25: #e6e6ec;  // subtle border
+$color_primary33: #cdcdd6;  // component border
+$color_primary50: #5b6070;
+$color_primary66: #5b6070;  // supporting text
+$color_primary75: #2b2f3a;  // strong secondary text
+$color_primary90: #18181b;
 $color_primary100: #18181b;
 
 // Modern Link Colors
-$color_link50: #6366f1;     // default (title) - indigo
-$color_link75: #4f46e5;     // default
-$color_link100: #4338ca;    // hover
-$color_link200: #f59e0b;    // active - amber
+$color_link50: $k23-accent;
+$color_link75: $k23-accent;
+$color_link100: $k23-accent-hover;
+$color_link200: $k23-accent-active;
 
-$color_pageBg: #ffffff;
+$color_pageBg: $k23-page;
 
 // Semantic Colors
 $color_contest_ranking_disqualified: #fecaca;
 
-$color_martor_resize_dragger: #e4e4e7;
+$color_martor_resize_dragger: $k23-border-subtle;
 
 // Rating Colors - More vibrant
 $color_rating_none: #a1a1aa;
@@ -41,7 +97,7 @@ $color_rating_grandmaster: #ef4444;
 $color_select2_search_dropdown: $color_primary0;
 
 // Activity Heatmap
-$color_user_submission_activity0: #e4e4e7;
+$color_user_submission_activity0: $k23-border-subtle;
 $color_user_submission_activity1: #bbf7d0;
 $color_user_submission_activity2: #4ade80;
 $color_user_submission_activity3: #22c55e;
@@ -61,9 +117,9 @@ $color_danger25: #fee2e2;
 $color_danger50: #fca5a5;
 $color_danger100: #dc2626;
 
-$color_problem_submit_select2: #71717a;
+$color_problem_submit_select2: $k23-muted;
 
-$color_voted_mark: #3b82f6;
+$color_voted_mark: $k23-accent;
 
 $path_to_root: '.';     // relative path from style.css to STATIC_ROOT
 

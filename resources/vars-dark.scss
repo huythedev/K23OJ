@@ -2,31 +2,86 @@
 
 $is_light_theme: false;
 
+// K23OJ semantic dark-theme tokens
+$k23-accent: #6366f1;
+$k23-accent-hover: #7c83f7;
+$k23-accent-active: #4f46e5;
+$k23-accent-tint: rgba(99, 102, 241, 0.18);
+$k23-selected-text: #c7d2fe;
+$k23-accent-focus-ring: rgba(129, 140, 248, 0.45);
+$k23-control-focus-ring: rgba(129, 140, 248, 0.32);
+
+$k23-border: #3a4a63;
+$k23-border-subtle: #2b3a52;
+$k23-text: #f8fafc;
+$k23-muted: #9aa8bd;
+$k23-page: #0f172a;
+$k23-surface: #1c2536;
+$k23-surface-subtle: #26334a;
+$k23-inset: #141c2b;
+$k23-points: #c7d2fe;
+$k23-nav-background: #151b2a;
+
+// Compatibility aliases for legacy interactive-accent selectors.
+$highlight_blue: $k23-accent;
+$highlight_blue_light: $k23-accent-hover;
+$highlight_blue_dark: $k23-accent-active;
+
+// Button state tokens
+$k23-primary-disabled-bg: #243044;
+$k23-primary-disabled-border: #33425c;
+$k23-primary-disabled-text: #6d7c93;
+$k23-secondary-text: #e2e8f0;
+$k23-secondary-hover-bg: #26334a;
+$k23-secondary-hover-border: #546a8c;
+$k23-secondary-active-bg: #2f3e59;
+$k23-secondary-active-border: #6b83a8;
+$k23-secondary-disabled-bg: #243044;
+$k23-secondary-disabled-border: #33425c;
+$k23-secondary-disabled-text: #6d7c93;
+$k23-danger: #ef4444;
+$k23-danger-hover: #dc2626;
+$k23-danger-active: #b91c1c;
+$k23-danger-focus-ring: rgba(239, 68, 68, 0.38);
+$k23-danger-subtle-bg: #1c2536;
+$k23-danger-subtle-border: #7f1d1d;
+$k23-danger-subtle-text: #fca5a5;
+$k23-success-action: #15803d;
+$k23-success-action-hover: #166534;
+$k23-success-action-active: #14532d;
+$k23-success-action-focus-ring: rgba(34, 197, 94, 0.38);
+$k23-ghost-text: #a5b4fc;
+$k23-ghost-hover-bg: rgba(99, 102, 241, 0.18);
+$k23-ghost-hover-text: #c7d2fe;
+$k23-ghost-active-bg: rgba(99, 102, 241, 0.30);
+$k23-ghost-active-text: #e0e7ff;
+$k23-ghost-disabled-text: #55637a;
+
 // Slate / cool-gray dark theme. Keep the canvas and surfaces distinct without
 // resorting to black backgrounds or pure-white type.
-$color_primary0: #161b22;      // cards, inputs, and panels
-$color_primary5: #1e293b;      // raised surfaces
-$color_primary10: #21262d;     // hover and active surfaces
-$color_primary25: #334155;     // subtle 1px separators
-$color_primary33: #475569;     // controls and stronger borders
-$color_primary50: #94a3b8;     // muted text and metadata
+$color_primary0: #1c2536;      // cards, inputs, and panels
+$color_primary5: #141c2b;      // inset surfaces
+$color_primary10: #26334a;     // hover and active surfaces
+$color_primary25: #2b3a52;     // subtle 1px separators
+$color_primary33: #3a4a63;     // controls and stronger borders
+$color_primary50: #9aa8bd;     // muted text and metadata
 $color_primary66: #cbd5e1;     // supporting text
 $color_primary75: #e2e8f0;     // strong secondary text
 $color_primary90: #f1f5f9;     // headings
 $color_primary100: #f8fafc;    // primary text (soft off-white)
 
 // Indigo is reserved for primary actions, active states, and links.
-$color_link50: #6366f1;
-$color_link75: #818cf8;
-$color_link100: #a5b4fc;
-$color_link200: #93c5fd;
+$color_link50: $k23-accent;
+$color_link75: $k23-accent;
+$color_link100: $k23-accent-hover;
+$color_link200: $k23-accent-active;
 
-$color_pageBg: #0f172a;
+$color_pageBg: $k23-page;
 
 // Semantic Colors
 $color_contest_ranking_disqualified: #450a0a;
 
-$color_martor_resize_dragger: #334155;
+$color_martor_resize_dragger: $k23-border-subtle;
 
 // Rating Colors - More vibrant for dark mode
 $color_rating_none: #94a3b8;
@@ -41,7 +96,7 @@ $color_rating_grandmaster: #f87171;
 $color_select2_search_dropdown: $color_primary10;
 
 // Activity Heatmap
-$color_user_submission_activity0: #334155;
+$color_user_submission_activity0: $k23-border-subtle;
 $color_user_submission_activity1: #14532d;
 $color_user_submission_activity2: #166534;
 $color_user_submission_activity3: #22c55e;
@@ -61,9 +116,9 @@ $color_danger25: #450a0a;
 $color_danger50: #b91c1c;
 $color_danger100: #fecaca;
 
-$color_problem_submit_select2: #94a3b8;
+$color_problem_submit_select2: $k23-muted;
 
-$color_voted_mark: #818cf8;
+$color_voted_mark: $k23-accent;
 
 $path_to_root: '..';    // relative path from style.css to STATIC_ROOT
 

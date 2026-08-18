@@ -1,7 +1,5 @@
-// Modern Design Tokens
-$highlight_blue: #10b981;  // Modern emerald green
-$highlight_blue_light: #34d399;
-$highlight_blue_dark: #059669;
+// Shared design tokens. Theme-dependent colors live in vars-default.scss and
+// vars-dark.scss because each theme bundle is compiled independently.
 $announcement_red: #dc2626;
 
 // Typography

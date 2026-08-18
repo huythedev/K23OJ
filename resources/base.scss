@@ -104,11 +104,7 @@ body {
     margin: 0 auto;
     font-size: $base_font_size;
     line-height: 1.6;
-    background-color: $color_primary5;
-    background-image: linear-gradient(135deg, $color_primary5 0%, $color_primary10 100%);
-    background-repeat: no-repeat;
-    background-attachment: fixed;
-    background-size: cover;
+    background: $color_pageBg;
     font-family: $font-family-sans;
     color: $color_primary100;
     -webkit-font-smoothing: antialiased;
@@ -290,7 +286,7 @@ noscript #noscript {
     border: none;
     border-left: 4px solid $highlight_blue;
     border-radius: 0 $widget_border_radius_lg $widget_border_radius_lg 0;
-    background: rgba(30, 27, 75, 0.95);
+    background: $k23-nav-background;
     backdrop-filter: blur(12px);
     z-index: 100000;
     padding: $spacing-4 $spacing-5;
