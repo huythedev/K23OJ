@@ -480,6 +480,7 @@ class SubmissionSourceDownload(SubmissionDetailBase):
 
 
 @require_POST
+@login_required
 def abort_submission(request, submission):
     submission = get_object_or_404(Submission, id=int(submission))
     if (not request.user.has_perm('judge.abort_any_submission') and
@@ -855,7 +856,7 @@ def single_submission(request):
     })
 
 
-class AllSubmissions(InfinitePaginationMixin, SubmissionsListBase):
+class AllSubmissions(LoginRequiredMixin, InfinitePaginationMixin, SubmissionsListBase):
     stats_update_interval = 3600
 
     @property

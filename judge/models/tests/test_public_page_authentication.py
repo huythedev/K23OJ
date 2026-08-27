@@ -4,15 +4,18 @@ from django.urls import reverse
 
 from judge.views.contests import ContestDetail, ContestList
 from judge.views.problem import ProblemDetail, ProblemList
+from judge.views.submission import AllSubmissions, SubmissionStatus, abort_submission
 
 
 class PublicPageAuthenticationTest(SimpleTestCase):
-    def test_problem_and_contest_pages_require_login(self):
+    def test_pages_require_login(self):
         for view, url, kwargs in (
             (ProblemList, reverse('problem_list'), {}),
             (ProblemDetail, reverse('problem_detail', args=('example',)), {'problem': 'example'}),
             (ContestList, reverse('contest_list'), {}),
             (ContestDetail, reverse('contest_view', args=('example',)), {'contest': 'example'}),
+            (AllSubmissions, reverse('all_submissions'), {}),
+            (SubmissionStatus, reverse('submission_status', args=(1,)), {'submission': 1}),
         ):
             with self.subTest(url=url):
                 request = RequestFactory().get(url)
@@ -21,3 +24,13 @@ class PublicPageAuthenticationTest(SimpleTestCase):
 
                 self.assertEqual(response.status_code, 302)
                 self.assertEqual(response.url, '%s?next=%s' % (reverse('auth_login'), url))
+
+    def test_submission_abort_requires_login(self):
+        url = reverse('submission_abort', args=(1,))
+        request = RequestFactory().post(url)
+        request.user = AnonymousUser()
+
+        response = abort_submission(request, submission=1)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, '%s?next=%s' % (reverse('auth_login'), url))
