@@ -249,7 +249,7 @@ class ContestListMixin(object):
         return context
 
 
-class ContestList(QueryStringSortMixin, DiggPaginatorMixin, TitleMixin, ContestListMixin, ListView):
+class ContestList(LoginRequiredMixin, QueryStringSortMixin, DiggPaginatorMixin, TitleMixin, ContestListMixin, ListView):
     model = Contest
     paginate_by = 20
     template_name = 'contest/list.html'
@@ -434,7 +434,7 @@ class ContestMixin(object):
             return generic_message(request, _('Permission denied'), e)
 
 
-class ContestDetail(ContestMixin, TitleMixin, CommentedDetailView):
+class ContestDetail(LoginRequiredMixin, ContestMixin, TitleMixin, CommentedDetailView):
     template_name = 'contest/contest.html'
 
     def is_comment_locked(self):
