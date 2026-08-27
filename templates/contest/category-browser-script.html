@@ -1,0 +1,55 @@
+<script type="text/javascript">
+    (function () {
+        'use strict';
+
+        var browser = document.getElementById('contest-category-browser');
+        if (!browser) {
+            return;
+        }
+
+        var buttons = browser.querySelectorAll('[data-category-view-option]');
+        var storageKey = 'contest-category-view';
+
+        function saveView(view) {
+            try {
+                window.localStorage.setItem(storageKey, view);
+            } catch (error) {
+                // Storage can be unavailable in private browsing or when the
+                // user blocks site data. The switch still works for this page.
+            }
+        }
+
+        function setView(view, shouldSave) {
+            if (view !== 'grid' && view !== 'list') {
+                view = 'grid';
+            }
+
+            browser.setAttribute('data-category-view', view);
+            for (var index = 0; index < buttons.length; index++) {
+                var button = buttons[index];
+                button.setAttribute(
+                    'aria-pressed',
+                    button.getAttribute('data-category-view-option') === view ? 'true' : 'false'
+                );
+            }
+
+            if (shouldSave) {
+                saveView(view);
+            }
+        }
+
+        var initialView = 'grid';
+        try {
+            initialView = window.localStorage.getItem(storageKey) || initialView;
+        } catch (error) {
+            // Keep the accessible grid default when storage is unavailable.
+        }
+        setView(initialView, false);
+
+        for (var index = 0; index < buttons.length; index++) {
+            buttons[index].addEventListener('click', function () {
+                setView(this.getAttribute('data-category-view-option'), true);
+            });
+        }
+    }());
+</script>

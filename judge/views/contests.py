@@ -66,66 +66,14 @@ class ContestCategoryList(TitleMixin, ListView):
     context_object_name = 'categories'
 
     def get_queryset(self):
-        return ContestCategory.objects.all().prefetch_related('contests')
+        # The category index is the root of the folder browser. Descendants
+        # are intentionally shown only after opening their parent category.
+        return ContestCategory.objects.filter(parent__isnull=True).prefetch_related('contests')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        categories = list(context['categories'])
-        active_category_slug = self.request.GET.get('category')
-        active_category = next((item for item in categories if item.slug == active_category_slug), None)
-
-        categories_by_id = {item.id: item for item in categories}
-        expanded_category_ids = set()
-        if active_category is not None:
-            parent_id = active_category.parent_id
-            while parent_id is not None:
-                expanded_category_ids.add(parent_id)
-                parent = categories_by_id.get(parent_id)
-                if parent is None:
-                    break
-                parent_id = parent.parent_id
-
         context['now'] = timezone.now()
-        context['category_hierarchy'] = self._build_category_hierarchy(categories)
-        context['active_category_id'] = active_category.id if active_category is not None else None
-        context['expanded_category_ids'] = expanded_category_ids
         return context
-
-    @staticmethod
-    def _build_category_hierarchy(categories):
-        categories = list(categories)
-        children_map = defaultdict(list)
-        for category in categories:
-            children_map[category.parent_id].append(category)
-
-        for entries in children_map.values():
-            entries.sort(key=lambda item: item.name.lower())
-
-        visited = set()
-
-        def walk(parent_id):
-            nodes = []
-            for category in children_map.get(parent_id, []):
-                if category.id in visited:
-                    continue
-                visited.add(category.id)
-                nodes.append({
-                    'category': category,
-                    'children': walk(category.id),
-                })
-            return nodes
-
-        hierarchy = walk(None)
-
-        for category in sorted(categories, key=lambda item: item.name.lower()):
-            if category.id not in visited:
-                visited.add(category.id)
-                hierarchy.append({
-                    'category': category,
-                    'children': walk(category.id),
-                })
-
-        return hierarchy
 
 
 class ContestCategoryCreate(PermissionRequiredMixin, TitleMixin, FormView):
@@ -178,7 +126,15 @@ class ContestCategoryDetail(TitleMixin, DetailView):
         context['can_edit'] = self.request.user.has_perm('judge.change_contestcategory')
         context['contests'] = Contest.get_visible_contests(self.request.user) \
             .filter(categories=self.object).order_by('-start_time', 'key')
-        context['subcategories'] = self.object.children.order_by('name')
+        context['subcategories'] = self.object.children.order_by('name').prefetch_related('contests')
+        ancestors = []
+        ancestor = self.object.parent
+        seen_ancestor_ids = {self.object.id}
+        while ancestor is not None and ancestor.id not in seen_ancestor_ids:
+            ancestors.append(ancestor)
+            seen_ancestor_ids.add(ancestor.id)
+            ancestor = ancestor.parent
+        context['category_ancestors'] = list(reversed(ancestors))
         return context
 
 

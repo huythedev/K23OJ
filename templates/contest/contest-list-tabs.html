@@ -20,10 +20,12 @@
 
 {% block tabs %}
     {% if hide_private_contests is not none %}
-        <div style="padding: 0.75em 1em 0.75em 0;">
-            <input id="hide-private-contests-checkbox" type="checkbox">
-            <label for="hide-private-contests-checkbox">{{ _('Hide private contests') }}</label>
-        </div>
+        <li class="tab contest-visibility-toggle">
+            <label for="hide-private-contests-checkbox">
+                <input id="hide-private-contests-checkbox" type="checkbox">
+                {{ _('Hide private contests') }}
+            </label>
+        </li>
     {% endif %}
     {% if perms.judge.add_contest %}
         {{ make_tab('new', 'fa-plus', url('contest_new'), _('Add new contest')) }}

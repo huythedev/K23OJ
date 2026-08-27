@@ -5,96 +5,16 @@
     {% include "contest/contest-list-tabs.html" %}
 {% endblock %}
 
+{% block content_js_media %}
+    {% include "contest/category-browser-script.html" %}
+{% endblock %}
+
 {% block body %}
-    <div class="content-description">
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.8em;">
-            <h4 style="margin: 0;">{{ _('Contest categories') }}</h4>
-            {% if perms.judge.add_contestcategory %}
-                <a class="button" href="{{ url('contest_category_create') }}">{{ _('Create category') }}</a>
-            {% endif %}
-        </div>
-        <hr>
-
-        {% if category_hierarchy %}
-            <style>
-                .contest-category-tree,
-                .contest-category-tree ul {
-                    list-style: none;
-                    margin: 0;
-                    padding-left: 0;
-                }
-
-                .contest-category-tree ul {
-                    margin-top: 0.4em;
-                    margin-left: 1.2em;
-                    padding-left: 0.8em;
-                    border-left: 2px solid #ececec;
-                }
-
-                .contest-category-node {
-                    margin-bottom: 0.6em;
-                }
-
-                .contest-category-label {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 0.5em;
-                }
-
-                .contest-category-meta {
-                    margin-top: 0.25em;
-                    opacity: 0.75;
-                    font-size: 0.92em;
-                }
-
-                .contest-category-tree summary {
-                    cursor: pointer;
-                }
-
-                .contest-category-active > .contest-category-label > a {
-                    font-weight: 700;
-                    text-decoration: underline;
-                }
-            </style>
-
-            <ul class="contest-category-tree">
-                {% for node in category_hierarchy recursive %}
-                    {% set category = node.category %}
-                    {% set has_children = node.children|length > 0 %}
-                    {% set is_active = active_category_id == category.id %}
-                    {% set is_expanded = is_active or (category.id in expanded_category_ids) %}
-                    <li class="contest-category-node{% if is_active %} contest-category-active{% endif %}">
-                        {% if has_children %}
-                            <details{% if is_expanded %} open{% endif %}>
-                                <summary>
-                                    <span class="contest-category-label">
-                                        <a href="{{ category.get_absolute_url() }}">{{ category.name }}</a>
-                                        <span style="opacity: 0.7;">({{ category.slug }})</span>
-                                    </span>
-                                </summary>
-                                <div class="contest-category-meta">
-                                    {{ _('Contests: %(count)s', count=category.contests.count()) }}
-                                    • {{ _('Updated: %(date)s', date=category.updated_at|date(_('M j, Y, G:i'))) }}
-                                </div>
-                                <ul>
-                                    {{ loop(node.children) }}
-                                </ul>
-                            </details>
-                        {% else %}
-                            <div class="contest-category-label">
-                                <a href="{{ category.get_absolute_url() }}">{{ category.name }}</a>
-                                <span style="opacity: 0.7;">({{ category.slug }})</span>
-                            </div>
-                            <div class="contest-category-meta">
-                                {{ _('Contests: %(count)s', count=category.contests.count()) }}
-                                • {{ _('Updated: %(date)s', date=category.updated_at|date(_('M j, Y, G:i'))) }}
-                            </div>
-                        {% endif %}
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p>{{ _('No categories yet.') }}</p>
-        {% endif %}
-    </div>
+    {% set browser_categories = categories %}
+    {% set browser_title = _('All categories') %}
+    {% set browser_create_url = url('contest_category_create') if perms.judge.add_contestcategory else none %}
+    {% set browser_create_label = _('Create category') %}
+    {% set browser_empty_title = _('No categories yet') %}
+    {% set browser_empty_description = _('Create a category to organize contests into an easy-to-browse workspace.') %}
+    {% include "contest/category-browser.html" %}
 {% endblock %}

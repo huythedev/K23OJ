@@ -103,6 +103,42 @@
     justify-content: space-between;
 }
 
+// Keep the contest visibility filter aligned with the navigation tabs. It is
+// deliberately a list item so the tab list remains valid HTML.
+.tabs .contest-visibility-toggle {
+    display: flex;
+    align-items: center;
+
+    label {
+        display: inline-flex;
+        box-sizing: border-box;
+        align-items: center;
+        min-height: 2.1rem;
+        padding: 0.48rem 0.72rem;
+        gap: $spacing-2;
+        border-radius: $widget_border_radius;
+        color: $k23-muted;
+        font-size: 0.86rem;
+        font-weight: 650;
+        line-height: 1.42857;
+        white-space: nowrap;
+        cursor: pointer;
+
+        &:hover {
+            color: $k23-text;
+            background: $k23-surface;
+        }
+    }
+
+    input {
+        width: 1rem;
+        height: 1rem;
+        margin: 0;
+        accent-color: $k23-accent;
+        cursor: pointer;
+    }
+}
+
 .contest-list {
     td {
         vertical-align: middle !important;

@@ -1,0 +1,107 @@
+{% set folder_count = browser_categories|length %}
+<section id="contest-category-browser" class="contest-category-browser" data-category-view="grid"
+         aria-labelledby="category-browser-title">
+    <header class="category-browser-toolbar">
+        <div class="category-browser-heading">
+            <span class="category-browser-heading-icon" aria-hidden="true">
+                <i class="fa fa-folder-open"></i>
+            </span>
+            <div class="category-browser-heading-copy">
+                {% if browser_breadcrumbs %}
+                    <nav class="category-breadcrumbs" aria-label="{{ _('Category path') }}">
+                        <a href="{{ url('contest_category_list_create') }}">
+                            <i class="fa fa-folder-open" aria-hidden="true"></i>
+                            {{ _('All categories') }}
+                        </a>
+                        {% for ancestor in category_ancestors %}
+                            <i class="fa fa-chevron-right" aria-hidden="true"></i>
+                            <a href="{{ ancestor.get_absolute_url() }}">{{ ancestor.name }}</a>
+                        {% endfor %}
+                        <i class="fa fa-chevron-right" aria-hidden="true"></i>
+                        <span aria-current="page">{{ browser_title }}</span>
+                    </nav>
+                {% endif %}
+                <h3 id="category-browser-title" class="category-browser-title">{{ browser_title }}</h3>
+                <p class="category-browser-summary">
+                    {% trans count=folder_count %}
+                        {{ count }} folder
+                    {% pluralize %}
+                        {{ count }} folders
+                    {% endtrans %}
+                </p>
+            </div>
+        </div>
+
+        <div class="category-browser-actions">
+            {% if browser_create_url %}
+                <a class="button category-create-button" href="{{ browser_create_url }}">
+                    <i class="fa fa-plus" aria-hidden="true"></i>
+                    <span>{{ browser_create_label }}</span>
+                </a>
+            {% endif %}
+
+            <div class="category-view-switch" role="group" aria-label="{{ _('Category view') }}">
+                <button type="button" class="category-view-button" data-category-view-option="grid"
+                        aria-label="{{ _('Grid view') }}" aria-controls="contest-category-items"
+                        aria-pressed="true" title="{{ _('Grid view') }}">
+                    <i class="fa fa-th-large" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="category-view-button" data-category-view-option="list"
+                        aria-label="{{ _('List view') }}" aria-controls="contest-category-items"
+                        aria-pressed="false" title="{{ _('List view') }}">
+                    <i class="fa fa-list" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div id="contest-category-items">
+        {% if browser_categories %}
+            <div class="category-list-header" aria-hidden="true">
+                <span>{{ _('Name') }}</span>
+                <span class="category-list-header-path">{{ _('Path') }}</span>
+                <span>{{ _('Contests') }}</span>
+                <span>{{ _('Last modified') }}</span>
+            </div>
+
+            <ul class="category-items">
+                {% for category in browser_categories %}
+                    <li class="category-item" style="--category-depth: 0;" data-category-id="{{ category.id }}">
+                        <a class="category-item-link" href="{{ category.get_absolute_url() }}">
+                            <span class="category-name-cell">
+                                <i class="fa fa-folder category-folder-icon" aria-hidden="true"></i>
+                                <span class="category-name">{{ category.name }}</span>
+                            </span>
+                            <span class="category-path-cell">
+                                <span class="category-field-label">{{ _('Path') }}:</span>
+                                <code>{{ category.slug }}</code>
+                            </span>
+                            <span class="category-contest-cell">
+                                <i class="fa fa-trophy" aria-hidden="true"></i>
+                                <span class="category-field-label">{{ _('Contests') }}:</span>
+                                <span>{{ category.contests.count() }}</span>
+                            </span>
+                            <time class="category-updated-cell" datetime="{{ category.updated_at|date('c') }}">
+                                <i class="fa fa-clock-o" aria-hidden="true"></i>
+                                <span class="category-field-label">{{ _('Last modified') }}:</span>
+                                <span>{{ category.updated_at|date(_('M j, Y')) }}</span>
+                            </time>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="category-empty-state">
+                <i class="fa fa-folder-open-o" aria-hidden="true"></i>
+                <h4>{{ browser_empty_title }}</h4>
+                <p>{{ browser_empty_description }}</p>
+                {% if browser_create_url %}
+                    <a class="button" href="{{ browser_create_url }}">
+                        <i class="fa fa-plus" aria-hidden="true"></i>
+                        {{ browser_create_label }}
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</section>

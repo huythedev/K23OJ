@@ -5,69 +5,66 @@
     {% include "contest/contest-list-tabs.html" %}
 {% endblock %}
 
+{% block content_js_media %}
+    {% include "contest/category-browser-script.html" %}
+{% endblock %}
+
 {% block body %}
-    <div class="content-description">
-        <h3 style="margin-bottom: 0.6em;">{{ category.name }}</h3>
-
+    <div class="category-folder-page">
         {% if category.description %}
-            <div class="form-area" style="margin-bottom: 1.2em; border-left: 4px solid #6aa84f;">
-                <div style="font-weight: 600; margin-bottom: 0.5em; color: #355e2b;">{{ _('Description') }}</div>
-                <div style="line-height: 1.6;">{{ category.description|markdown('problem') }}</div>
-            </div>
+            <section class="category-description-card" aria-labelledby="category-description-title">
+                <h3 id="category-description-title">{{ _('Description') }}</h3>
+                <div>{{ category.description|markdown('problem') }}</div>
+            </section>
         {% endif %}
 
-        <h4>{{ _('Subcategories') }}</h4>
-        {% if perms.judge.add_contestcategory %}
-            <p>
-                <a class="button" href="{{ url('contest_category_create') }}?parent={{ category.slug }}">
-                    {{ _('Create subcategory') }}
-                </a>
-            </p>
-        {% endif %}
-        {% if subcategories %}
-            <ul>
-                {% for child in subcategories %}
-                    <li>
-                        <a href="{{ child.get_absolute_url() }}">{{ child.name }}</a>
-                        <span style="opacity: 0.7;">({{ child.slug }})</span>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p>{{ _('No subcategories yet.') }}</p>
-        {% endif %}
+        {% set browser_categories = subcategories %}
+        {% set browser_title = category.name %}
+        {% set browser_breadcrumbs = true %}
+        {% set browser_create_url = (url('contest_category_create') ~ '?parent=' ~ category.slug) if perms.judge.add_contestcategory else none %}
+        {% set browser_create_label = _('Create subcategory') %}
+        {% set browser_empty_title = _('No subcategories yet') %}
+        {% set browser_empty_description = _('This folder does not contain any subcategories.') %}
+        {% include "contest/category-browser.html" %}
 
-        <h4>{{ _('Contests in this category') }}</h4>
-        {% if can_edit %}
-            <p>
-                <a class="button" href="{{ url('contest_category_edit', category.slug) }}">{{ _('Edit category') }}</a>
-            </p>
-        {% endif %}
+        <section class="category-contests-panel" aria-labelledby="category-contests-title">
+            <header class="category-contests-header">
+                <h3 id="category-contests-title">{{ _('Contests in this category') }}</h3>
+                {% if can_edit %}
+                    <a class="button button-secondary button-sm" href="{{ url('contest_category_edit', category.slug) }}">
+                        <i class="fa fa-pencil" aria-hidden="true"></i>
+                        {{ _('Edit category') }}
+                    </a>
+                {% endif %}
+            </header>
 
-        {% if contests %}
-            <table class="table striped">
-                <thead>
-                    <tr>
-                        <th>{{ _('Contest') }}</th>
-                        <th>{{ _('Start') }}</th>
-                        <th>{{ _('End') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for contest in contests %}
-                        <tr>
-                            <td>
-                                <a href="{{ url('contest_view', contest.key) }}">{{ contest.name }}</a>
-                                <span style="opacity: 0.7;">({{ contest.key }})</span>
-                            </td>
-                            <td>{{ contest.start_time|date(_('M j, Y, G:i')) }}</td>
-                            <td>{{ contest.end_time|date(_('M j, Y, G:i')) }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <p>{{ _('No contests assigned to this category yet.') }}</p>
-        {% endif %}
+            {% if contests %}
+                <div class="category-contests-table-wrap">
+                    <table class="table striped">
+                        <thead>
+                            <tr>
+                                <th>{{ _('Contest') }}</th>
+                                <th>{{ _('Start') }}</th>
+                                <th>{{ _('End') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for contest in contests %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url('contest_view', contest.key) }}">{{ contest.name }}</a>
+                                        <span class="category-contest-key">{{ contest.key }}</span>
+                                    </td>
+                                    <td>{{ contest.start_time|date(_('M j, Y, G:i')) }}</td>
+                                    <td>{{ contest.end_time|date(_('M j, Y, G:i')) }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="category-contests-empty">{{ _('No contests assigned to this category yet.') }}</p>
+            {% endif %}
+        </section>
     </div>
 {% endblock %}

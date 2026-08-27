@@ -1,0 +1,638 @@
+@use "vars" as *;
+
+// Contest category browser
+//
+// The category index behaves like a lightweight file browser: one semantic
+// collection is rearranged into folder cards or compact rows by the view
+// switcher in templates/contest/category.html.
+.contest-category-browser {
+    overflow: hidden;
+    color: $k23-text;
+    background: $k23-surface;
+    border: 1px solid $k23-border;
+    border-radius: $widget_border_radius_xl;
+
+    .category-browser-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: $spacing-4;
+        min-height: 4.25rem;
+        padding: $spacing-4 $spacing-5;
+        border-bottom: 1px solid $k23-border-subtle;
+    }
+
+    .category-browser-heading {
+        display: flex;
+        align-items: center;
+        gap: $spacing-3;
+        min-width: 0;
+    }
+
+    .category-browser-heading-icon {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: $widget_border_radius_lg;
+        color: $k23-accent;
+        background: $k23-accent-tint;
+        font-size: 1.1rem;
+    }
+
+    .category-browser-heading-copy {
+        min-width: 0;
+    }
+
+    .category-browser-title {
+        overflow: hidden;
+        margin: 0;
+        color: $k23-text;
+        font-size: 1.08rem;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .category-browser-summary {
+        margin: 0.1rem 0 0;
+        color: $k23-muted;
+        font-size: 0.86rem;
+    }
+
+    .category-browser-actions {
+        display: flex;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: $spacing-3;
+    }
+
+    .category-create-button .fa {
+        font-size: 0.86rem;
+    }
+
+    .category-view-switch {
+        display: inline-flex;
+        overflow: hidden;
+        padding: 2px;
+        border: 1px solid $k23-border;
+        border-radius: 10px;
+        background: $k23-surface-subtle;
+    }
+
+    button.category-view-button {
+        width: 2.25rem;
+        height: 2.125rem;
+        padding: 0;
+        border: 0;
+        border-radius: 7px;
+        color: $k23-muted;
+        background: transparent;
+        box-shadow: none;
+
+        &:hover {
+            border: 0;
+            color: $k23-text;
+            background: $k23-surface;
+        }
+
+        &:active {
+            border: 0;
+            color: $k23-text;
+            background: $k23-surface;
+            transform: none;
+        }
+
+        &:focus-visible {
+            outline: 0;
+            box-shadow: inset 0 0 0 2px $k23-accent, 0 0 0 2px $k23-control-focus-ring;
+        }
+
+        &[aria-pressed='true'] {
+            color: $k23-selected-text;
+            background: $k23-accent-tint;
+        }
+    }
+
+    .category-list-header {
+        display: none;
+        grid-template-columns:
+            minmax(16rem, 2fr) minmax(10rem, 1.25fr)
+            minmax(7.5rem, 0.65fr) minmax(10rem, 0.85fr);
+        gap: $spacing-3;
+        padding: 0.65rem $spacing-4;
+        color: $k23-muted;
+        background: $k23-surface-subtle;
+        border-bottom: 1px solid $k23-border-subtle;
+        font-size: 0.76rem;
+        font-weight: 700;
+        letter-spacing: 0.035em;
+        text-transform: uppercase;
+    }
+
+    .category-items {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(14.5rem, 1fr));
+        gap: $spacing-3;
+        margin: 0;
+        padding: $spacing-4;
+        list-style: none;
+    }
+
+    .category-item {
+        min-width: 0;
+    }
+
+    .category-item-link {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: $spacing-3;
+        min-height: 8.5rem;
+        padding: $spacing-4;
+        box-sizing: border-box;
+        color: $k23-text;
+        background: $k23-surface-subtle;
+        border: 1px solid transparent;
+        border-radius: $widget_border_radius_lg;
+        text-decoration: none;
+        transition: background $transition-fast, border-color $transition-fast, box-shadow $transition-fast;
+
+        &:hover {
+            color: $k23-text;
+            background: $k23-surface;
+            border-color: $k23-border;
+            box-shadow: $shadow-sm;
+        }
+
+        &:active {
+            color: $k23-text;
+            background: $k23-surface-subtle;
+            border-color: $k23-accent;
+        }
+
+        &:focus-visible {
+            outline: 0;
+            border-color: $k23-accent;
+            box-shadow: 0 0 0 3px $k23-control-focus-ring;
+        }
+    }
+
+    .category-item.is-active .category-item-link {
+        background: $k23-accent-tint;
+        border-color: $k23-accent;
+    }
+
+    .category-name-cell {
+        display: flex;
+        grid-column: 1 / -1;
+        align-items: center;
+        gap: $spacing-3;
+        min-width: 0;
+    }
+
+    .category-folder-icon {
+        flex: 0 0 auto;
+        color: $k23-accent;
+        font-size: 1.35rem;
+    }
+
+    .category-name {
+        overflow: hidden;
+        min-width: 0;
+        color: $k23-text;
+        font-weight: 700;
+        line-height: 1.35;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .category-path-cell {
+        grid-column: 1 / -1;
+        min-width: 0;
+        color: $k23-muted;
+
+        code {
+            display: block;
+            overflow: hidden;
+            color: inherit;
+            font-family: $monospace-fonts;
+            font-size: 0.78rem;
+            line-height: 1.4;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    .category-contest-cell,
+    .category-updated-cell {
+        display: flex;
+        align-items: center;
+        align-self: end;
+        gap: $spacing-2;
+        min-width: 0;
+        color: $k23-muted;
+        font-size: 0.82rem;
+        line-height: 1.35;
+
+        .fa {
+            flex: 0 0 auto;
+            color: $k23-muted;
+        }
+    }
+
+    .category-contest-cell {
+        grid-column: 1;
+    }
+
+    .category-updated-cell {
+        grid-column: 2;
+        justify-self: end;
+        white-space: nowrap;
+    }
+
+    .category-field-label {
+        position: absolute;
+        overflow: hidden;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    &[data-category-view='list'] {
+        .category-list-header {
+            display: grid;
+        }
+
+        .category-items {
+            display: block;
+            padding: 0;
+        }
+
+        .category-item + .category-item {
+            border-top: 1px solid $k23-border-subtle;
+        }
+
+        .category-item-link {
+            grid-template-columns:
+                minmax(16rem, 2fr) minmax(10rem, 1.25fr)
+                minmax(7.5rem, 0.65fr) minmax(10rem, 0.85fr);
+            gap: $spacing-3;
+            min-height: 3.75rem;
+            padding: 0.65rem $spacing-4;
+            background: $k23-surface;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+
+            &:hover {
+                background: $k23-surface-subtle;
+                border: 0;
+                box-shadow: none;
+            }
+
+            &:active {
+                background: $k23-accent-tint;
+                border: 0;
+            }
+
+            &:focus-visible {
+                position: relative;
+                z-index: 1;
+                border: 0;
+                box-shadow: inset 0 0 0 2px $k23-accent;
+            }
+        }
+
+        .category-item.is-active .category-item-link {
+            background: $k23-accent-tint;
+            border: 0;
+        }
+
+        .category-name-cell {
+            grid-column: 1;
+            padding-left: min(calc(var(--category-depth, 0) * 1.45rem), 8rem);
+        }
+
+        .category-folder-icon {
+            font-size: 1.05rem;
+        }
+
+        .category-name {
+            font-weight: 650;
+        }
+
+        .category-path-cell {
+            grid-column: 2;
+
+            code {
+                font-size: 0.77rem;
+            }
+        }
+
+        .category-contest-cell {
+            grid-column: 3;
+            align-self: center;
+
+            .fa {
+                display: none;
+            }
+        }
+
+        .category-updated-cell {
+            grid-column: 4;
+            align-self: center;
+            justify-self: start;
+
+            .fa {
+                display: none;
+            }
+        }
+    }
+
+    .category-empty-state {
+        padding: 4rem $spacing-5;
+        color: $k23-muted;
+        text-align: center;
+
+        .fa-folder-open-o {
+            display: block;
+            margin-bottom: $spacing-4;
+            color: $k23-accent;
+            font-size: 2.5rem;
+        }
+
+        h4 {
+            margin: 0;
+            color: $k23-text;
+            font-size: 1.05rem;
+        }
+
+        p {
+            max-width: 28rem;
+            margin: $spacing-2 auto 0;
+        }
+
+        .button {
+            margin-top: $spacing-5;
+        }
+    }
+}
+
+@media (max-width: 920px) {
+    .contest-category-browser[data-category-view='list'] {
+        .category-list-header,
+        .category-item-link {
+            grid-template-columns: minmax(14rem, 2fr) minmax(6rem, 0.65fr) minmax(9rem, 0.85fr);
+        }
+
+        .category-list-header-path {
+            display: none;
+        }
+
+        // Keep the path available to assistive technology even when the
+        // visual list no longer has room for that column.
+        .category-path-cell {
+            position: absolute;
+            overflow: hidden;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .category-contest-cell {
+            grid-column: 2;
+        }
+
+        .category-updated-cell {
+            grid-column: 3;
+        }
+    }
+}
+
+@media (max-width: 680px) {
+    .contest-category-browser {
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+
+        .category-browser-toolbar {
+            align-items: flex-start;
+            padding: $spacing-4;
+        }
+
+        .category-browser-heading-icon {
+            display: none;
+        }
+
+        .category-browser-actions {
+            gap: $spacing-2;
+        }
+
+        .category-create-button {
+            width: 2.5rem;
+            padding: 0;
+
+            span {
+                position: absolute;
+                overflow: hidden;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
+        }
+
+        .category-items {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        &[data-category-view='list'] {
+            .category-list-header {
+                display: none;
+            }
+
+            .category-item-link {
+                grid-template-columns: minmax(0, 1fr) auto;
+                row-gap: $spacing-2;
+                min-height: 5.25rem;
+                padding: $spacing-3 $spacing-4;
+            }
+
+            .category-name-cell {
+                grid-column: 1 / -1;
+                padding-left: min(calc(var(--category-depth, 0) * 0.85rem), 4.5rem);
+            }
+
+            .category-contest-cell {
+                grid-column: 1;
+                padding-left: min(calc(var(--category-depth, 0) * 0.85rem + 1.8rem), 6.3rem);
+
+                .fa {
+                    display: inline-block;
+                }
+            }
+
+            .category-updated-cell {
+                grid-column: 2;
+                justify-self: end;
+
+                .fa {
+                    display: inline-block;
+                }
+            }
+        }
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .contest-category-browser .category-item-link {
+        transition: none;
+    }
+}
+
+.category-folder-page {
+    display: grid;
+    gap: $spacing-4;
+}
+
+.category-breadcrumbs {
+    // The global navigation rule targets every <nav>. Reset it here so this
+    // compact path stays in the browser header instead of being fixed to the
+    // top of the viewport.
+    position: static;
+    z-index: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $spacing-1 $spacing-2;
+    margin: 0 0 0.2rem;
+    padding: 0;
+    color: $k23-muted;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    font-size: 0.78rem;
+    line-height: 1.35;
+
+    a {
+        display: inline-flex;
+        align-items: center;
+        gap: $spacing-1;
+        color: $k23-muted;
+        font-weight: 650;
+
+        &:hover {
+            color: $k23-accent;
+            text-decoration: underline;
+        }
+    }
+
+    > .fa {
+        color: $k23-border;
+        font-size: 0.65rem;
+    }
+
+    [aria-current='page'] {
+        color: $k23-text;
+        font-weight: 700;
+    }
+}
+
+.category-description-card,
+.category-contests-panel {
+    background: $k23-surface;
+    border: 1px solid $k23-border;
+    border-radius: $widget_border_radius_lg;
+}
+
+.category-description-card {
+    padding: $spacing-4 $spacing-5;
+
+    h3 {
+        margin: 0 0 $spacing-2;
+        color: $k23-text;
+        font-size: 1rem;
+    }
+}
+
+.category-contests-panel {
+    overflow: hidden;
+}
+
+.category-contests-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-3;
+    min-height: 3.75rem;
+    padding: 0 $spacing-5;
+    border-bottom: 1px solid $k23-border-subtle;
+
+    h3 {
+        margin: 0;
+        color: $k23-text;
+        font-size: 1rem;
+    }
+}
+
+.category-contests-table-wrap {
+    overflow-x: auto;
+
+    .table {
+        width: 100%;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+    }
+}
+
+.category-contest-key {
+    margin-left: $spacing-2;
+    color: $k23-muted;
+    font-family: $monospace-fonts;
+    font-size: 0.8rem;
+}
+
+.category-contests-empty {
+    margin: 0;
+    padding: $spacing-5;
+    color: $k23-muted;
+}
+
+@media (max-width: 680px) {
+    .category-folder-page {
+        gap: $spacing-3;
+    }
+
+    .category-description-card {
+        padding: $spacing-4;
+    }
+
+    .category-contests-panel {
+        border-right: 0;
+        border-left: 0;
+        border-radius: 0;
+    }
+
+    .category-contests-header {
+        padding: 0 $spacing-4;
+    }
+
+    .category-contest-key {
+        display: block;
+        margin: $spacing-1 0 0;
+    }
+}
