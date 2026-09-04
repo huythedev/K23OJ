@@ -71,6 +71,17 @@ class ContestCategory(models.Model):
         validators=[RegexValidator('^([a-z0-9_]+)(/[a-z0-9_]+)*$', _('Category slug must be path-like: ^([a-z0-9_]+)(/[a-z0-9_]+)*$'))],
     )
     description = models.TextField(verbose_name=_('description'), blank=True)
+    is_public = models.BooleanField(
+        verbose_name=_('publicly visible'),
+        default=True,
+        help_text=_('Used only when no organizations are selected. Private categories are visible to their creator.'),
+    )
+    organizations = models.ManyToManyField(
+        Organization,
+        verbose_name=_('organizations'),
+        blank=True,
+        help_text=_('When selected, only members of these organizations may view this category.'),
+    )
     parent = models.ForeignKey(
         'self',
         verbose_name=_('parent category'),
@@ -101,6 +112,47 @@ class ContestCategory(models.Model):
 
     def get_absolute_url(self):
         return reverse('contest_category_detail', args=[self.slug])
+
+    @classmethod
+    def get_visible_categories(cls, user):
+        """Return folders that a user may browse.
+
+        A folder can be reached through either its own access policy or an
+        assigned contest. This deliberately combines the two policies: a user
+        who may view a contest must be able to browse to its folder, even when
+        the folder itself is restricted to another organization.
+        """
+        queryset = cls.objects.all()
+        if user.is_authenticated and (
+            user.has_perm('judge.change_contestcategory') or
+            user.has_perm('judge.see_private_contest') or
+            user.has_perm('judge.edit_all_contest')
+        ):
+            return queryset
+
+        category_access = Q(is_public=True, organizations__isnull=True)
+        if user.is_authenticated:
+            category_access |= Q(organizations__in=user.profile.organizations.all())
+            category_access |= Q(is_public=False, organizations__isnull=True, created_by=user.profile)
+
+        visible_ids = set(queryset.filter(
+            category_access | Q(contests__in=Contest.get_visible_contests(user)),
+        ).values_list('pk', flat=True))
+
+        # Also include ancestors so an authorized user can navigate to an
+        # accessible subcategory or contest from the folder index.
+        parents = dict(queryset.values_list('pk', 'parent_id'))
+        pending = list(visible_ids)
+        while pending:
+            parent_id = parents.get(pending.pop())
+            if parent_id is not None and parent_id not in visible_ids:
+                visible_ids.add(parent_id)
+                pending.append(parent_id)
+
+        return queryset.filter(pk__in=visible_ids)
+
+    def is_accessible_by(self, user):
+        return self.get_visible_categories(user).filter(pk=self.pk).exists()
 
 
 class Contest(models.Model):

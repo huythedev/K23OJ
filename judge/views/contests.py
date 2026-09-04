@@ -68,7 +68,9 @@ class ContestCategoryList(TitleMixin, ListView):
     def get_queryset(self):
         # The category index is the root of the folder browser. Descendants
         # are intentionally shown only after opening their parent category.
-        return ContestCategory.objects.filter(parent__isnull=True).prefetch_related('contests')
+        return ContestCategory.get_visible_categories(self.request.user).filter(parent__isnull=True).prefetch_related(
+            Prefetch('contests', queryset=Contest.get_visible_contests(self.request.user)),
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -116,6 +118,9 @@ class ContestCategoryDetail(TitleMixin, DetailView):
     slug_url_kwarg = 'slug'
     template_name = 'contest/category-detail.html'
 
+    def get_queryset(self):
+        return ContestCategory.get_visible_categories(self.request.user)
+
     def get_title(self):
         return _('Contest category: %(name)s') % {'name': self.object.name}
 
@@ -126,7 +131,9 @@ class ContestCategoryDetail(TitleMixin, DetailView):
         context['can_edit'] = self.request.user.has_perm('judge.change_contestcategory')
         context['contests'] = Contest.get_visible_contests(self.request.user) \
             .filter(categories=self.object).order_by('-start_time', 'key')
-        context['subcategories'] = self.object.children.order_by('name').prefetch_related('contests')
+        context['subcategories'] = ContestCategory.get_visible_categories(self.request.user).filter(
+            parent=self.object,
+        ).prefetch_related(Prefetch('contests', queryset=Contest.get_visible_contests(self.request.user)))
         ancestors = []
         ancestor = self.object.parent
         seen_ancestor_ids = {self.object.id}

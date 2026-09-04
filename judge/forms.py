@@ -1139,6 +1139,7 @@ class ContestCategoryForm(ModelForm):
         if self.instance and self.instance.pk:
             parent_queryset = parent_queryset.exclude(pk=self.instance.pk)
         self.fields['parent'].queryset = parent_queryset
+        self.fields['organizations'].queryset = Organization.objects.order_by('name')
 
         queryset = Contest.objects.none()
         if self.user and self.user.is_authenticated:
@@ -1211,9 +1212,13 @@ class ContestCategoryForm(ModelForm):
 
     class Meta:
         model = ContestCategory
-        fields = ['name', 'slug', 'parent', 'description', 'contests']
+        fields = ['name', 'slug', 'parent', 'description', 'is_public', 'organizations', 'contests']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 4}),
+            'organizations': HeavySelect2MultipleWidget(
+                data_view='organization_select2',
+                attrs={'style': 'width: 100%'},
+            ),
         }
 
 

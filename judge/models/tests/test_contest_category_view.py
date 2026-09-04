@@ -3,7 +3,7 @@ from django.urls import reverse
 from lxml import html
 
 from judge.models import ContestCategory
-from judge.models.tests.util import create_contest
+from judge.models.tests.util import create_contest, create_organization, create_user
 
 
 class ContestCategoryBrowserTest(TestCase):
@@ -17,6 +17,32 @@ class ContestCategoryBrowserTest(TestCase):
             parent=cls.alpha,
         )
         cls.graphs.contests.add(create_contest(key='category_browser'))
+
+        cls.organization_a = create_organization(name='category organization a')
+        cls.organization_b = create_organization(name='category organization b')
+        cls.member_a = create_user(username='category_member_a')
+        cls.member_b = create_user(username='category_member_b')
+        cls.member_a.profile.organizations.add(cls.organization_a)
+        cls.member_b.profile.organizations.add(cls.organization_b)
+
+        cls.organization_category = ContestCategory.objects.create(
+            name='Organization B category',
+            slug='organization_b_category',
+        )
+        cls.organization_category.organizations.add(cls.organization_b)
+        cls.organization_contest = create_contest(
+            key='organization_a_contest',
+            is_visible=True,
+            is_organization_private=True,
+            organizations=('category organization a',),
+        )
+        cls.organization_category.contests.add(cls.organization_contest)
+
+        cls.private_category = ContestCategory.objects.create(
+            name='Private category',
+            slug='private_category',
+            is_public=False,
+        )
 
     def get_document(self, url):
         response = self.client.get(url)
@@ -74,6 +100,37 @@ class ContestCategoryBrowserTest(TestCase):
         detail = self.client.get(reverse('contest_category_detail', args=[self.alpha.slug]))
         self.assertEqual(root.status_code, 200)
         self.assertEqual(detail.status_code, 200)
+
+    def test_category_and_contest_organization_access_is_additive(self):
+        category_url = reverse('contest_category_detail', args=[self.organization_category.slug])
+
+        self.client.force_login(self.member_a)
+        member_a_response = self.client.get(category_url)
+        self.assertEqual(member_a_response.status_code, 200)
+        self.assertContains(member_a_response, self.organization_contest.name)
+
+        self.client.force_login(self.member_b)
+        member_b_response = self.client.get(category_url)
+        self.assertEqual(member_b_response.status_code, 200)
+        self.assertNotContains(member_b_response, self.organization_contest.name)
+
+        self.client.logout()
+        self.assertEqual(self.client.get(category_url).status_code, 404)
+
+    def test_private_categories_are_not_visible_without_an_access_grant(self):
+        private_url = reverse('contest_category_detail', args=[self.private_category.slug])
+        self.assertEqual(self.client.get(private_url).status_code, 404)
+        self.client.force_login(self.member_a)
+        self.assertEqual(self.client.get(private_url).status_code, 404)
+
+    def test_category_organization_members_can_find_the_folder_from_the_index(self):
+        self.client.force_login(self.member_a)
+        member_a_categories = set(ContestCategory.get_visible_categories(self.member_a).values_list('pk', flat=True))
+        self.assertIn(self.organization_category.pk, member_a_categories)
+
+        self.client.force_login(self.member_b)
+        member_b_categories = set(ContestCategory.get_visible_categories(self.member_b).values_list('pk', flat=True))
+        self.assertIn(self.organization_category.pk, member_b_categories)
 
     def test_empty_state_replaces_the_root_collection(self):
         ContestCategory.objects.all().delete()

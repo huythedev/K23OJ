@@ -58,10 +58,10 @@ class ContestTagAdmin(admin.ModelAdmin):
 
 
 class ContestCategoryAdmin(admin.ModelAdmin):
-    fields = ('name', 'slug', 'description', 'parent', 'contests', 'created_by')
-    list_display = ('name', 'slug', 'parent', 'updated_at', 'created_by')
+    fields = ('name', 'slug', 'description', 'is_public', 'organizations', 'parent', 'contests', 'created_by')
+    list_display = ('name', 'slug', 'is_public', 'parent', 'updated_at', 'created_by')
     search_fields = ('name', 'slug')
-    filter_horizontal = ('contests',)
+    filter_horizontal = ('organizations', 'contests')
     readonly_fields = ('created_by',)
 
     def save_model(self, request, obj, form, change):
