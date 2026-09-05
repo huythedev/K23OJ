@@ -1128,6 +1128,7 @@ class ContestCategoryForm(ModelForm):
         queryset=Contest.objects.none(),
         required=False,
         label=_('Contests'),
+        help_text=ContestCategory._meta.get_field('contests').help_text,
         widget=HeavySelect2MultipleWidget(data_view='contest_select2', attrs={'style': 'width: 100%'}),
     )
 
@@ -1140,6 +1141,10 @@ class ContestCategoryForm(ModelForm):
             parent_queryset = parent_queryset.exclude(pk=self.instance.pk)
         self.fields['parent'].queryset = parent_queryset
         self.fields['organizations'].queryset = Organization.objects.order_by('name')
+        if not (self.user and self.user.is_authenticated and (
+            self.user.has_perm('judge.add_contestcategory') or self.user.has_perm('judge.change_contestcategory')
+        )):
+            self.fields.pop('groups')
 
         queryset = Contest.objects.none()
         if self.user and self.user.is_authenticated:
@@ -1212,13 +1217,14 @@ class ContestCategoryForm(ModelForm):
 
     class Meta:
         model = ContestCategory
-        fields = ['name', 'slug', 'parent', 'description', 'is_public', 'organizations', 'contests']
+        fields = ['name', 'slug', 'parent', 'description', 'is_public', 'organizations', 'groups', 'contests']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 4}),
             'organizations': HeavySelect2MultipleWidget(
                 data_view='organization_select2',
                 attrs={'style': 'width: 100%'},
             ),
+            'groups': Select2MultipleWidget(attrs={'style': 'width: 100%'}),
         }
 
 

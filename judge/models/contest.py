@@ -24,7 +24,7 @@ from judge.models.submission import Submission
 from judge.ratings import rate_contest
 from judge.utils.unicode import utf8bytes
 
-__all__ = ['ContestCategory', 'Contest', 'ContestTag', 'ContestAnnouncement', 'ContestParticipation',
+__all__ = ['ContestCategory', 'ContestCategoryGroup', 'Contest', 'ContestTag', 'ContestAnnouncement', 'ContestParticipation',
            'ContestProblem', 'ContestSubmission', 'Rating']
 
 
@@ -62,6 +62,25 @@ class ContestTag(models.Model):
         verbose_name_plural = _('contest tags')
 
 
+class ContestCategoryGroup(models.Model):
+    name = models.CharField(max_length=100, unique=True, verbose_name=_('group name'))
+    users = models.ManyToManyField(
+        Profile,
+        blank=True,
+        related_name='+',
+        verbose_name=_('users'),
+        help_text=_('Manually selected users. Group names and membership are visible only in the admin.'),
+    )
+
+    class Meta:
+        ordering = ('name',)
+        verbose_name = _('category group')
+        verbose_name_plural = _('category groups')
+
+    def __str__(self):
+        return self.name
+
+
 class ContestCategory(models.Model):
     name = models.CharField(max_length=100, verbose_name=_('category name'))
     slug = models.CharField(
@@ -74,13 +93,22 @@ class ContestCategory(models.Model):
     is_public = models.BooleanField(
         verbose_name=_('publicly visible'),
         default=True,
-        help_text=_('Used only when no organizations are selected. Private categories are visible to their creator.'),
+        help_text=_('Used only when no organizations or groups are selected. '
+                    'Private categories are visible to their creator.'),
     )
     organizations = models.ManyToManyField(
         Organization,
         verbose_name=_('organizations'),
         blank=True,
-        help_text=_('When selected, only members of these organizations may view this category.'),
+        help_text=_('Members of any selected organization or group may view this category and its assigned contests.'),
+    )
+    groups = models.ManyToManyField(
+        ContestCategoryGroup,
+        verbose_name=_('groups'),
+        blank=True,
+        related_name='categories',
+        help_text=_('Members of any selected group or organization may view this category and its assigned contests. '
+                    'Groups are not displayed to users.'),
     )
     parent = models.ForeignKey(
         'self',
@@ -90,7 +118,11 @@ class ContestCategory(models.Model):
         on_delete=SET_NULL,
         related_name='children',
     )
-    contests = models.ManyToManyField('Contest', verbose_name=_('contests'), blank=True, related_name='categories')
+    contests = models.ManyToManyField(
+        'Contest', verbose_name=_('contests'), blank=True, related_name='categories',
+        help_text=_('Users allowed by this category can view all assigned contests, '
+                    'including private or unpublished contests.'),
+    )
     created_by = models.ForeignKey(
         Profile,
         verbose_name=_('created by'),
@@ -114,14 +146,8 @@ class ContestCategory(models.Model):
         return reverse('contest_category_detail', args=[self.slug])
 
     @classmethod
-    def get_visible_categories(cls, user):
-        """Return folders that a user may browse.
-
-        A folder can be reached through either its own access policy or an
-        assigned contest. This deliberately combines the two policies: a user
-        who may view a contest must be able to browse to its folder, even when
-        the folder itself is restricted to another organization.
-        """
+    def get_accessible_categories(cls, user):
+        """Return categories whose own policy grants access to their contests."""
         queryset = cls.objects.all()
         if user.is_authenticated and (
             user.has_perm('judge.change_contestcategory') or
@@ -130,13 +156,26 @@ class ContestCategory(models.Model):
         ):
             return queryset
 
-        category_access = Q(is_public=True, organizations__isnull=True)
+        unrestricted = Q(organizations__isnull=True, groups__isnull=True)
+        category_access = Q(is_public=True) & unrestricted
         if user.is_authenticated:
             category_access |= Q(organizations__in=user.profile.organizations.all())
-            category_access |= Q(is_public=False, organizations__isnull=True, created_by=user.profile)
+            category_access |= Q(groups__users=user.profile)
+            category_access |= Q(is_public=False, created_by=user.profile) & unrestricted
+
+        return queryset.filter(category_access).distinct()
+
+    @classmethod
+    def get_visible_categories(cls, user):
+        """Include folders needed to navigate to accessible contests and children.
+
+        Navigation alone does not grant access to other contests in a folder.
+        Only the folder's own policy can grant that access.
+        """
+        queryset = cls.objects.all()
 
         visible_ids = set(queryset.filter(
-            category_access | Q(contests__in=Contest.get_visible_contests(user)),
+            Q(pk__in=cls.get_accessible_categories(user)) | Q(contests__in=Contest.get_visible_contests(user)),
         ).values_list('pk', flat=True))
 
         # Also include ancestors so an authorized user can navigate to an
@@ -533,9 +572,14 @@ class Contest(models.Model):
         pass
 
     def access_check(self, user):
+        # Category policies are an additional grant, including for contests
+        # that are not otherwise published or shared with this user.
+        if ContestCategory.get_accessible_categories(user).filter(contests=self).exists():
+            return
+
         # Do unauthenticated check here so we can skip authentication checks later on.
         if not user.is_authenticated:
-            # Unauthenticated users can only see visible, non-private contests
+            # Without a category grant, anonymous users need a public contest.
             if not self.is_visible:
                 raise self.Inaccessible()
             if self.is_private or self.is_organization_private:
@@ -609,8 +653,11 @@ class Contest(models.Model):
 
     @classmethod
     def get_visible_contests(cls, user):
+        category_access = Q(categories__in=ContestCategory.get_accessible_categories(user))
         if not user.is_authenticated:
-            return cls.get_public_contests()
+            return cls.objects.filter(
+                Q(is_visible=True, is_organization_private=False, is_private=False) | category_access,
+            ).defer('description').distinct()
 
         queryset = cls.objects.defer('description')
         if not (user.has_perm('judge.see_private_contest') or user.has_perm('judge.edit_all_contest')):
@@ -627,6 +674,7 @@ class Contest(models.Model):
             q |= Q(authors=user.profile)
             q |= Q(curators=user.profile)
             q |= Q(testers=user.profile)
+            q |= category_access
             queryset = queryset.filter(q)
         return queryset.distinct()
 
