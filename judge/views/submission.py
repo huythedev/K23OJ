@@ -899,6 +899,9 @@ class ForceContestMixin(object):
     def access_check(self, request):
         super(ForceContestMixin, self).access_check(request)
 
+        if not self.contest.is_accessible_by(request.user):
+            raise Http404()
+
         if not request.user.has_perm('judge.see_private_contest'):
             if not self.contest.is_visible:
                 raise Http404()

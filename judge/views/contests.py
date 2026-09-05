@@ -848,7 +848,7 @@ class ContestCalendar(TitleMixin, ContestListMixin, TemplateView):
         else:
             context['title'] = _('Contests in %(month)s') % {'month': date_filter(month, _('F Y'))}
 
-        dates = Contest.objects.aggregate(min=Min('start_time'), max=Max('end_time'))
+        dates = self.get_queryset().aggregate(min=Min('start_time'), max=Max('end_time'))
         min_month = (self.today.year, self.today.month)
         if dates['min'] is not None:
             min_month = dates['min'].year, dates['min'].month

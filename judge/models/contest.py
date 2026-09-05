@@ -120,8 +120,8 @@ class ContestCategory(models.Model):
     )
     contests = models.ManyToManyField(
         'Contest', verbose_name=_('contests'), blank=True, related_name='categories',
-        help_text=_('Users allowed by this category can view all assigned contests, '
-                    'including private or unpublished contests.'),
+        help_text=_('Selected organization and group members can view assigned private or unpublished contests. '
+                    'Making the category public does not publish its contests.'),
     )
     created_by = models.ForeignKey(
         Profile,
@@ -147,7 +147,7 @@ class ContestCategory(models.Model):
 
     @classmethod
     def get_accessible_categories(cls, user):
-        """Return categories whose own policy grants access to their contests."""
+        """Return categories whose own policy allows browsing the folder."""
         queryset = cls.objects.all()
         if user.is_authenticated and (
             user.has_perm('judge.change_contestcategory') or
@@ -166,11 +166,24 @@ class ContestCategory(models.Model):
         return queryset.filter(category_access).distinct()
 
     @classmethod
+    def get_contest_access_categories(cls, user):
+        """Only explicit membership grants access to restricted contests.
+
+        Public folders, folder ownership, and category management permissions
+        do not override a contest's publication or privacy settings.
+        """
+        if not user.is_authenticated:
+            return cls.objects.none()
+        return cls.objects.filter(
+            Q(organizations__in=user.profile.organizations.all()) | Q(groups__users=user.profile),
+        ).distinct()
+
+    @classmethod
     def get_visible_categories(cls, user):
         """Include folders needed to navigate to accessible contests and children.
 
         Navigation alone does not grant access to other contests in a folder.
-        Only the folder's own policy can grant that access.
+        Only explicit organization or group membership grants that access.
         """
         queryset = cls.objects.all()
 
@@ -574,7 +587,7 @@ class Contest(models.Model):
     def access_check(self, user):
         # Category policies are an additional grant, including for contests
         # that are not otherwise published or shared with this user.
-        if ContestCategory.get_accessible_categories(user).filter(contests=self).exists():
+        if ContestCategory.get_contest_access_categories(user).filter(contests=self).exists():
             return
 
         # Do unauthenticated check here so we can skip authentication checks later on.
@@ -653,7 +666,7 @@ class Contest(models.Model):
 
     @classmethod
     def get_visible_contests(cls, user):
-        category_access = Q(categories__in=ContestCategory.get_accessible_categories(user))
+        category_access = Q(categories__in=ContestCategory.get_contest_access_categories(user))
         if not user.is_authenticated:
             return cls.objects.filter(
                 Q(is_visible=True, is_organization_private=False, is_private=False) | category_access,

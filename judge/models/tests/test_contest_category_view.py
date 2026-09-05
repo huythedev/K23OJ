@@ -18,7 +18,7 @@ class ContestCategoryBrowserTest(TestCase):
             slug='alpha/graphs',
             parent=cls.alpha,
         )
-        cls.graphs.contests.add(create_contest(key='category_browser'))
+        cls.graphs.contests.add(create_contest(key='category_browser', is_visible=True))
 
         cls.organization_a = create_organization(name='category organization a', slug='category_org_a')
         cls.organization_b = create_organization(name='category organization b', slug='category_org_b')
@@ -182,6 +182,37 @@ class ContestCategoryAccessTest(TestCase):
         self.assert_access(self.outsider, False)
         self.assert_access(AnonymousUser(), False)
 
+    def test_unassigned_group_membership_grants_no_contests(self):
+        unassigned_group = ContestCategoryGroup.objects.create(name='Unassigned roster')
+        unassigned_group.users.add(self.outsider.profile)
+        public_category = ContestCategory.objects.create(name='Public folder', slug='public_unassigned')
+        private_category = ContestCategory.objects.create(
+            name='Private folder', slug='private_unassigned', is_public=False,
+        )
+        for key, category in (('public_folder_hidden', public_category),
+                              ('private_folder_hidden', private_category), ('uncategorized_hidden', None)):
+            contest = create_contest(key=key, is_private=True)
+            if category is not None:
+                category.contests.add(contest)
+            self.assert_access(self.outsider, False, contest)
+        self.assert_access(self.outsider, False)
+        self.assertFalse(ContestCategory.get_contest_access_categories(self.outsider).exists())
+
+    def test_group_grant_is_limited_to_its_assigned_category(self):
+        unrelated_group = ContestCategoryGroup.objects.create(name='Unrelated roster')
+        unrelated_group.users.add(self.outsider.profile)
+        unrelated_category = ContestCategory.objects.create(name='Unrelated folder', slug='unrelated_folder')
+        unrelated_category.groups.add(unrelated_group)
+        unrelated_contest = create_contest(key='unrelated_contest', is_private=True)
+        unrelated_category.contests.add(unrelated_contest)
+        self.assert_access(self.member, True)
+        self.assert_access(self.member, False, unrelated_contest)
+        self.assert_access(self.outsider, False)
+        self.assert_access(self.outsider, True, unrelated_contest)
+        self.category.groups.remove(self.group)
+        self.assert_access(self.member, False)
+        self.assert_access(self.member, False, unrelated_contest)
+
     def test_any_selected_group_grants_access_without_duplicate_contests(self):
         second_group = ContestCategoryGroup.objects.create(name='Second roster')
         second_group.users.add(self.member.profile, self.outsider.profile)
@@ -197,16 +228,25 @@ class ContestCategoryAccessTest(TestCase):
         self.category.contests.remove(self.contest)
         self.assert_access(self.member, False)
 
-    def test_public_and_creator_category_grants(self):
+    def test_public_folder_and_creator_do_not_grant_restricted_contests(self):
         self.category.groups.clear()
-        self.assert_access(self.outsider, True)
-        self.assert_access(AnonymousUser(), True)
+        self.assertTrue(self.category.is_accessible_by(self.outsider))
+        self.assertTrue(self.category.is_accessible_by(AnonymousUser()))
+        self.assert_access(self.outsider, False)
+        self.assert_access(AnonymousUser(), False)
         self.category.is_public = False
         self.category.created_by = self.member.profile
         self.category.save()
-        self.assert_access(self.member, True)
+        self.assertTrue(self.category.is_accessible_by(self.member))
+        self.assert_access(self.member, False)
         self.assert_access(self.outsider, False)
         self.assert_access(AnonymousUser(), False)
+
+    def test_category_management_does_not_grant_restricted_contests(self):
+        editor = create_user(username='folder_only_editor', user_permissions=('change_contestcategory',))
+        self.assertTrue(self.category.is_accessible_by(editor))
+        self.assert_access(editor, False)
+        self.assertNotIn(self.contest, ContestCategoryForm(user=editor).fields['contests'].queryset)
 
     def test_browsing_via_a_contest_does_not_grant_sibling_contests(self):
         shared = create_contest(key='individually_shared', is_visible=True, is_private=True,
@@ -253,6 +293,7 @@ class ContestCategoryAccessTest(TestCase):
 
     def test_category_editor_has_separate_organization_and_group_selectors(self):
         editor = create_user(username='category_editor', user_permissions=('change_contestcategory',))
+        self.group.users.add(editor.profile)
         self.client.force_login(editor)
         self.category.organizations.add(self.organization)
         url = reverse('contest_category_edit', args=[self.category.slug])
