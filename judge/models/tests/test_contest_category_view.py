@@ -173,6 +173,70 @@ class ContestCategoryAccessTest(TestCase):
                 self.assertFalse(self.category.is_accessible_by(user))
                 self.assert_access(user, False)
 
+    def test_organization_and_group_access_inherits_through_subcategories(self):
+        self.category.organizations.add(self.organization)
+        child = ContestCategory.objects.create(
+            name='Child', slug='training/child', parent=self.category, is_public=False,
+        )
+        grandchild = ContestCategory.objects.create(
+            name='Grandchild', slug='training/child/grandchild', parent=child, is_public=False,
+        )
+        # Descendant grants are additive, even when the child has its own roster.
+        other_group = ContestCategoryGroup.objects.create(name='Child roster')
+        child.groups.add(other_group)
+        contest = create_contest(key='descendant_hidden', is_private=True, is_organization_private=True)
+        grandchild.contests.add(contest)
+        empty = ContestCategory.objects.create(
+            name='Empty child', slug='training/empty', parent=self.category, is_public=False,
+        )
+        for user in (self.member, self.org_member):
+            with self.subTest(user=user.username):
+                for category in (child, grandchild, empty):
+                    self.assertTrue(category.is_accessible_by(user))
+                self.assert_access(user, True, contest)
+                self.assertFalse(contest.is_editable_by(user))
+                self.client.force_login(user)
+                self.assertContains(self.client.get(child.get_absolute_url()), grandchild.name)
+                self.assertContains(self.client.get(grandchild.get_absolute_url()), contest.name)
+                self.assertContains(self.client.get(contest.get_absolute_url()), contest.name)
+                self.assertEqual(self.client.get('/api/v2/contest/' + contest.key).status_code, 200)
+        for user in (self.outsider, AnonymousUser()):
+            with self.subTest(user=str(user)):
+                self.assertFalse(grandchild.is_accessible_by(user))
+                self.assert_access(user, False, contest)
+
+    def test_inherited_access_is_revoked_when_membership_or_assignment_is_removed(self):
+        child = ContestCategory.objects.create(
+            name='Child', slug='training/child', parent=self.category, is_public=False,
+        )
+        contest = create_contest(key='revocable_descendant')
+        child.contests.add(contest)
+        self.assert_access(self.member, True, contest)
+        self.group.users.remove(self.member.profile)
+        self.assert_access(self.member, False, contest)
+        self.group.users.add(self.member.profile)
+        self.category.groups.clear()
+        self.assert_access(self.member, False, contest)
+        self.category.organizations.add(self.organization)
+        self.assert_access(self.org_member, True, contest)
+        self.org_member.profile.organizations.clear()
+        self.assert_access(self.org_member, False, contest)
+        self.org_member.profile.organizations.add(self.organization)
+        self.category.organizations.clear()
+        self.assert_access(self.org_member, False, contest)
+
+    def test_reparenting_revokes_inherited_access_and_slug_prefix_does_not_grant_it(self):
+        child = ContestCategory.objects.create(
+            name='Child', slug='training/child', parent=self.category, is_public=False,
+        )
+        contest = create_contest(key='reparented_hidden')
+        child.contests.add(contest)
+        self.assert_access(self.member, True, contest)
+        child.parent = None
+        child.save()
+        self.assertFalse(child.is_accessible_by(self.member))
+        self.assert_access(self.member, False, contest)
+
     def test_groups_and_organizations_are_alternative_grants(self):
         self.category.organizations.add(self.organization)
         for user in (self.member, self.org_member):

@@ -100,14 +100,16 @@ class ContestCategory(models.Model):
         Organization,
         verbose_name=_('organizations'),
         blank=True,
-        help_text=_('Members of any selected organization or group may view this category and its assigned contests.'),
+        help_text=_('Members of any selected organization or group may view this category, '
+                    'its subcategories, and all contests assigned to them.'),
     )
     groups = models.ManyToManyField(
         ContestCategoryGroup,
         verbose_name=_('groups'),
         blank=True,
         related_name='categories',
-        help_text=_('Members of any selected group or organization may view this category and its assigned contests. '
+        help_text=_('Members of any selected group or organization may view this category, '
+                    'its subcategories, and all contests assigned to them. '
                     'Groups are not displayed to users.'),
     )
     parent = models.ForeignKey(
@@ -120,7 +122,8 @@ class ContestCategory(models.Model):
     )
     contests = models.ManyToManyField(
         'Contest', verbose_name=_('contests'), blank=True, related_name='categories',
-        help_text=_('Selected organization and group members can view assigned private or unpublished contests. '
+        help_text=_('Organization and group members selected here or in an ancestor category can view '
+                    'assigned private or unpublished contests. '
                     'Making the category public does not publish its contests.'),
     )
     created_by = models.ForeignKey(
@@ -147,7 +150,7 @@ class ContestCategory(models.Model):
 
     @classmethod
     def get_accessible_categories(cls, user):
-        """Return categories whose own policy allows browsing the folder."""
+        """Return categories accessible through their own or inherited policy."""
         queryset = cls.objects.all()
         if user.is_authenticated and (
             user.has_perm('judge.change_contestcategory') or
@@ -159,24 +162,39 @@ class ContestCategory(models.Model):
         unrestricted = Q(organizations__isnull=True, groups__isnull=True)
         category_access = Q(is_public=True) & unrestricted
         if user.is_authenticated:
-            category_access |= Q(organizations__in=user.profile.organizations.all())
-            category_access |= Q(groups__users=user.profile)
+            category_access |= Q(pk__in=cls.get_contest_access_categories(user))
             category_access |= Q(is_public=False, created_by=user.profile) & unrestricted
 
         return queryset.filter(category_access).distinct()
 
     @classmethod
     def get_contest_access_categories(cls, user):
-        """Only explicit membership grants access to restricted contests.
+        """Explicit membership grants access to a category and its descendants.
 
         Public folders, folder ownership, and category management permissions
         do not override a contest's publication or privacy settings.
         """
         if not user.is_authenticated:
             return cls.objects.none()
-        return cls.objects.filter(
+        accessible_ids = set(cls.objects.filter(
             Q(organizations__in=user.profile.organizations.all()) | Q(groups__users=user.profile),
-        ).distinct()
+        ).values_list('pk', flat=True))
+        if not accessible_ids:
+            return cls.objects.none()
+
+        # Follow parent links, not slug prefixes. Track visited nodes so even
+        # malformed category cycles cannot make access checks loop forever.
+        children = {}
+        for category_id, parent_id in cls.objects.values_list('pk', 'parent_id'):
+            children.setdefault(parent_id, []).append(category_id)
+        pending = list(accessible_ids)
+        while pending:
+            for child_id in children.get(pending.pop(), ()):
+                if child_id not in accessible_ids:
+                    accessible_ids.add(child_id)
+                    pending.append(child_id)
+
+        return cls.objects.filter(pk__in=accessible_ids)
 
     @classmethod
     def get_visible_categories(cls, user):
